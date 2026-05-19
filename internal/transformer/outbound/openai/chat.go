@@ -16,7 +16,13 @@ import (
 type ChatOutbound struct{}
 
 func (o *ChatOutbound) TransformRequest(ctx context.Context, request *model.InternalLLMRequest, baseUrl, key string) (*http.Request, error) {
-	request.ClearHelpFields()
+	// Preserve reasoning_content for models that require it (e.g., MiMo)
+	for i := range request.Messages {
+		request.Messages[i].ReasoningSignature = nil
+		request.Messages[i].CacheControl = nil
+	}
+	request.ExtraBody = nil
+	request.Include = nil
 
 	// Convert developer role to system role for compatibility
 	for i := range request.Messages {
