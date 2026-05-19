@@ -17,6 +17,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
           ref: master
 
@@ -54,6 +55,7 @@ jobs:
       - name: Upload Release
         uses: softprops/action-gh-release@v2
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           files: build/archives/*
           prerelease: false
           tag_name: ${{ steps.tag.outputs.TAG_NAME }}
