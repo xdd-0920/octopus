@@ -253,6 +253,120 @@ func RelayLogList(ctx context.Context, startTime, endTime *int, page, pageSize i
 	return result, nil
 }
 
+// RelayLogListForAPI 查询日志列表（用于API返回，不包含大文本字段）
+func RelayLogListForAPI(ctx context.Context, startTime, endTime *int, page, pageSize int) ([]model.RelayLogListItem, error) {
+	enabled, err := SettingGetBool(model.SettingKeyRelayLogKeepEnabled)
+	if err != nil {
+		return nil, err
+	}
+	hasTimeFilter := startTime != nil && endTime != nil
+
+	// 获取缓存中符合条件的日志
+	relayLogCacheLock.Lock()
+	var cachedLogs []model.RelayLog
+	for _, log := range relayLogCache {
+		if hasTimeFilter {
+			if log.Time >= int64(*startTime) && log.Time <= int64(*endTime) {
+				cachedLogs = append(cachedLogs, log)
+			}
+		} else {
+			cachedLogs = append(cachedLogs, log)
+		}
+	}
+	relayLogCacheLock.Unlock()
+
+	// 反转缓存日志顺序（原本新的在末尾，反转后新的在前面，方便分页）
+	for i, j := 0, len(cachedLogs)-1; i < j; i, j = i+1, j-1 {
+		cachedLogs[i], cachedLogs[j] = cachedLogs[j], cachedLogs[i]
+	}
+
+	cacheCount := len(cachedLogs)
+	offset := (page - 1) * pageSize
+
+	var result []model.RelayLogListItem
+
+	// 先从缓存中取（缓存是最新的日志）
+	if offset < cacheCount {
+		cacheEnd := offset + pageSize
+		if cacheEnd > cacheCount {
+			cacheEnd = cacheCount
+		}
+		// 将缓存中的日志转换为列表项
+		for _, log := range cachedLogs[offset:cacheEnd] {
+			result = append(result, convertToRelayLogListItem(log))
+		}
+	}
+
+	// 如果启用了日志保存，缓存不够时从数据库补充
+	if enabled {
+		remaining := pageSize - len(result)
+		if remaining > 0 {
+			dbOffset := 0
+			if offset > cacheCount {
+				dbOffset = offset - cacheCount
+			}
+
+			query := db.GetDB().WithContext(ctx)
+			if hasTimeFilter {
+				query = query.Where("time >= ? AND time <= ?", *startTime, *endTime)
+			}
+
+			var dbLogs []model.RelayLogListItem
+			// 只查询需要的字段，排除大文本字段
+			if err := query.Select("id", "time", "request_model_name", "request_api_key_name", "channel_id", "channel_name", "actual_model_name", "input_tokens", "output_tokens", "cached_tokens", "ftut", "use_time", "cost", "error", "attempts", "total_attempts").
+				Order("id DESC").Offset(dbOffset).Limit(remaining).Find(&dbLogs).Error; err != nil {
+				return nil, err
+			}
+			result = append(result, dbLogs...)
+		}
+	}
+
+	return result, nil
+}
+
+// convertToRelayLogListItem 将完整的RelayLog转换为列表项
+func convertToRelayLogListItem(log model.RelayLog) model.RelayLogListItem {
+	return model.RelayLogListItem{
+		ID:                log.ID,
+		Time:              log.Time,
+		RequestModelName:  log.RequestModelName,
+		RequestAPIKeyName: log.RequestAPIKeyName,
+		ChannelId:         log.ChannelId,
+		ChannelName:       log.ChannelName,
+		ActualModelName:   log.ActualModelName,
+		InputTokens:       log.InputTokens,
+		OutputTokens:      log.OutputTokens,
+		CachedTokens:      log.CachedTokens,
+		Ftut:              log.Ftut,
+		UseTime:           log.UseTime,
+		Cost:              log.Cost,
+		Error:             log.Error,
+		Attempts:          log.Attempts,
+		TotalAttempts:     log.TotalAttempts,
+	}
+}
+
+// RelayLogGetByID 根据ID获取单个日志详情
+func RelayLogGetByID(ctx context.Context, id int64) (*model.RelayLog, error) {
+	// 先从缓存中查找
+	relayLogCacheLock.Lock()
+	for _, log := range relayLogCache {
+		if log.ID == id {
+			relayLogCacheLock.Unlock()
+			return &log, nil
+		}
+	}
+	relayLogCacheLock.Unlock()
+
+	// 如果缓存中没有，从数据库查询
+	var log model.RelayLog
+	if err := db.GetDB().WithContext(ctx).Where("id = ?", id).First(&log).Error; err != nil {
+		return nil, err
+	}
+
+	return &log, nil
+}
+
 func RelayLogClear(ctx context.Context) error {
 	relayLogCacheLock.Lock()
 	relayLogCache = make([]model.RelayLog, 0, relayLogMaxSize)

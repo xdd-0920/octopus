@@ -25,7 +25,7 @@ export interface ChannelAttempt {
 }
 
 /**
- * 日志数据
+ * 日志数据（完整）
  */
 export interface RelayLog {
     id: number;
@@ -43,6 +43,28 @@ export interface RelayLog {
     cost: number;                // 消耗费用
     request_content: string;     // 请求内容
     response_content: string;    // 响应内容
+    error: string;               // 错误信息
+    attempts?: ChannelAttempt[]; // 所有尝试记录
+    total_attempts?: number;     // 总尝试次数
+}
+
+/**
+ * 日志数据（列表项，不包含大文本字段）
+ */
+export interface RelayLogListItem {
+    id: number;
+    time: number;                // 时间戳
+    request_model_name: string;  // 请求模型名称
+    request_api_key_name?: string; // 请求使用的 API Key 名称
+    channel: number;             // 实际使用的渠道ID
+    channel_name: string;        // 渠道名称
+    actual_model_name: string;   // 实际使用模型名称
+    input_tokens: number;        // 输入Token
+    output_tokens: number;       // 输出Token
+    cached_tokens: number;       // 缓存命中Token
+    ftut: number;                // 首字时间(毫秒)
+    use_time: number;            // 总用时(毫秒)
+    cost: number;                // 消耗费用
     error: string;               // 错误信息
     attempts?: ChannelAttempt[]; // 所有尝试记录
     total_attempts?: number;     // 总尝试次数
@@ -83,6 +105,20 @@ export function useClearLogs() {
     });
 }
 
+/**
+ * 获取日志详情
+ * 
+ * @param id 日志ID
+ * @returns 日志详情
+ */
+export async function getLogDetail(id: number): Promise<RelayLog> {
+    const result = await apiClient.get<RelayLog>(`/api/v1/log/detail?id=${id}`);
+    if (!result) {
+        throw new Error('日志详情获取失败');
+    }
+    return result;
+}
+
 const logsInfiniteQueryKey = (pageSize: number) => ['logs', 'infinite', pageSize] as const;
 
 /**
@@ -114,7 +150,7 @@ export function useLogs(options: { pageSize?: number } = {}) {
             const params = new URLSearchParams();
             params.set('page', String(pageParam));
             params.set('page_size', String(pageSize));
-            const result = await apiClient.get<RelayLog[] | null>(`/api/v1/log/list?${params.toString()}`);
+            const result = await apiClient.get<RelayLogListItem[] | null>(`/api/v1/log/list?${params.toString()}`);
             return result ?? [];
         },
         getNextPageParam: (lastPage, allPages) => {
@@ -128,7 +164,7 @@ export function useLogs(options: { pageSize?: number } = {}) {
     const logs = useMemo(() => {
         const pages = logsQuery.data?.pages ?? [];
         const seen = new Set<number>();
-        const merged: RelayLog[] = [];
+        const merged: RelayLogListItem[] = [];
 
         for (const page of pages) {
             for (const log of page) {
@@ -171,10 +207,10 @@ export function useLogs(options: { pageSize?: number } = {}) {
 
                 eventSource.onmessage = (event) => {
                     try {
-                        const log: RelayLog = JSON.parse(event.data);
+                        const log: RelayLogListItem = JSON.parse(event.data);
                         queryClient.setQueryData(
                             logsInfiniteQueryKey(pageSize),
-                            (old: InfiniteData<RelayLog[], number> | undefined) => {
+                            (old: InfiniteData<RelayLogListItem[], number> | undefined) => {
                                 if (!old) {
                                     return { pages: [[log]], pageParams: [1] };
                                 }

@@ -447,7 +447,8 @@
             "retryDetails": "Retry Details",
             "attempts": "attempts",
             "success": "Success",
-            "failed": "Failed"
+            "failed": "Failed",
+            "clickToLoadContent": "Click to load content"
         }
     },
     "channel": {

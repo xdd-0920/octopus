@@ -21,6 +21,10 @@ func init() {
 				Handle(listLog),
 		).
 		AddRoute(
+			router.NewRoute("/detail", http.MethodGet).
+				Handle(getLogDetail),
+		).
+		AddRoute(
 			router.NewRoute("/clear", http.MethodDelete).
 				Handle(clearLog),
 		).
@@ -65,13 +69,36 @@ func listLog(c *gin.Context) {
 		endTime = &et
 	}
 
-	logs, err := op.RelayLogList(c.Request.Context(), startTime, endTime, page, pageSize)
+	// 使用优化的函数，不包含大文本字段
+	logs, err := op.RelayLogListForAPI(c.Request.Context(), startTime, endTime, page, pageSize)
 	if err != nil {
 		resp.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	resp.Success(c, logs)
+}
+
+func getLogDetail(c *gin.Context) {
+	idStr := c.Query("id")
+	if idStr == "" {
+		resp.Error(c, http.StatusBadRequest, "id is required")
+		return
+	}
+
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		resp.Error(c, http.StatusBadRequest, "invalid id")
+		return
+	}
+
+	log, err := op.RelayLogGetByID(c.Request.Context(), id)
+	if err != nil {
+		resp.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	resp.Success(c, log)
 }
 
 func clearLog(c *gin.Context) {

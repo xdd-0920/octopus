@@ -8,7 +8,7 @@ import JsonView from '@uiw/react-json-view';
 import { githubDarkTheme } from '@uiw/react-json-view/githubDark';
 import { githubLightTheme } from '@uiw/react-json-view/githubLight';
 import { useTheme } from 'next-themes';
-import { type RelayLog, type ChannelAttempt } from '@/api/endpoints/log';
+import { type RelayLog, type RelayLogListItem, type ChannelAttempt, getLogDetail } from '@/api/endpoints/log';
 import { getModelIcon } from '@/lib/model-icons';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -184,7 +184,7 @@ function DeferredJsonContent({ content, fallbackText }: { content: string | unde
     );
 }
 
-export function LogCard({ log }: { log: RelayLog }) {
+export function LogCard({ log }: { log: RelayLogListItem }) {
     const t = useTranslations('log.card');
     const { Avatar: ModelAvatar, color: brandColor } = useMemo(
         () => getModelIcon(log.actual_model_name),
@@ -195,6 +195,23 @@ export function LogCard({ log }: { log: RelayLog }) {
     const hasError = !!log.error;
     const hasMultipleAttempts = log.attempts && log.attempts.length > 1;
     const [isDiagnosticExpanded, setIsDiagnosticExpanded] = useState(false);
+    const [fullLog, setFullLog] = useState<RelayLog | null>(null);
+    const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+
+    // 加载完整日志详情
+    const loadFullLog = async () => {
+        if (fullLog || isLoadingDetail) return;
+        
+        setIsLoadingDetail(true);
+        try {
+            const detail = await getLogDetail(log.id);
+            setFullLog(detail);
+        } catch (error) {
+            console.error('加载日志详情失败:', error);
+        } finally {
+            setIsLoadingDetail(false);
+        }
+    };
 
     return (
         <TooltipProvider>
@@ -444,7 +461,22 @@ export function LogCard({ log }: { log: RelayLog }) {
                                                 </Badge>
                                             </div>
                                             <div className="flex-1 overflow-auto min-h-0 custom-scrollbar">
-                                                <DeferredJsonContent content={log.request_content} fallbackText={t('noRequestContent')} />
+                                                {isLoadingDetail ? (
+                                                    <div className="flex items-center justify-center h-full">
+                                                        <Loader2 className="h-5 w-5 text-muted-foreground animate-spin" />
+                                                    </div>
+                                                ) : fullLog?.request_content ? (
+                                                    <DeferredJsonContent content={fullLog.request_content} fallbackText={t('noRequestContent')} />
+                                                ) : (
+                                                    <div className="flex items-center justify-center h-full">
+                                                        <button 
+                                                            onClick={loadFullLog}
+                                                            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                                                        >
+                                                            {t('clickToLoadContent')}
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                         <div className="flex flex-col rounded-2xl border border-border bg-muted/30 overflow-hidden min-h-0">
@@ -456,7 +488,22 @@ export function LogCard({ log }: { log: RelayLog }) {
                                                 </Badge>
                                             </div>
                                             <div className="flex-1 overflow-auto min-h-0 custom-scrollbar">
-                                                <DeferredJsonContent content={log.response_content} fallbackText={t('noResponseContent')} />
+                                                {isLoadingDetail ? (
+                                                    <div className="flex items-center justify-center h-full">
+                                                        <Loader2 className="h-5 w-5 text-muted-foreground animate-spin" />
+                                                    </div>
+                                                ) : fullLog?.response_content ? (
+                                                    <DeferredJsonContent content={fullLog.response_content} fallbackText={t('noResponseContent')} />
+                                                ) : (
+                                                    <div className="flex items-center justify-center h-full">
+                                                        <button 
+                                                            onClick={loadFullLog}
+                                                            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                                                        >
+                                                            {t('clickToLoadContent')}
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
