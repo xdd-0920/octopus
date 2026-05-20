@@ -203,7 +203,6 @@ html.dark,
   .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background-color: oklch(0.7 0 0 / 0.5);
   }
-}
 
   body::before,
   body::after {
