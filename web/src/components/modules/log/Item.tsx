@@ -235,7 +235,7 @@ export function LogCard({ log }: { log: RelayLog }) {
                                     <Pin className="size-3.5 shrink-0 text-amber-500" />
                                 )}
                             </div>
-                            <div className="grid grid-cols-2 md:grid-cols-9 gap-x-4 gap-y-2 text-xs tabular-nums text-muted-foreground">
+                            <div className="grid grid-cols-2 md:grid-cols-7 gap-x-4 gap-y-2 text-xs tabular-nums text-muted-foreground">
                                 <div className="flex items-center gap-1.5">
                                     <Clock className="size-3.5 shrink-0" style={{ color: brandColor }} />
                                     <span>{formatTime(log.time)}</span>
