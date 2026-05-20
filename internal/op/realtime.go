@@ -2,10 +2,21 @@ package op
 
 import (
 	"context"
+	"sync/atomic"
 	"time"
-
-	"github.com/bestruirui/octopus/internal/relay"
 )
+
+var activeRequests atomic.Int64
+
+// ActiveRequestsAdd 增加活跃请求计数
+func ActiveRequestsAdd(delta int64) {
+	activeRequests.Add(delta)
+}
+
+// ActiveRequestsCount 返回当前活跃请求数
+func ActiveRequestsCount() int64 {
+	return activeRequests.Load()
+}
 
 // RealtimeStats 实时监控统计数据
 type RealtimeStats struct {
@@ -19,7 +30,7 @@ type RealtimeStats struct {
 // GetRealtimeStats 获取实时监控统计数据
 func GetRealtimeStats() RealtimeStats {
 	stats := RealtimeStats{
-		ActiveRequests: relay.ActiveRequests(),
+		ActiveRequests: ActiveRequestsCount(),
 	}
 
 	// 从当前小时统计计算 QPS、平均响应时间、错误率
