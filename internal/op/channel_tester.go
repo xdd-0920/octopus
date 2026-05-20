@@ -140,5 +140,38 @@ func TestChannel(ctx context.Context, req model.ChannelTestRequest) model.Channe
 		log.Warnf("channel test failed: %d, status: %d, error: %s", req.ChannelID, resp.StatusCode, result.Error)
 	}
 
+	// 写入测试日志，方便在日志页面查看测试记录
+	attemptStatus := model.AttemptSuccess
+	attemptMsg := "测试通过"
+	if !result.Success {
+		attemptStatus = model.AttemptFailed
+		attemptMsg = result.Error
+	}
+	testLog := model.RelayLog{
+		Time:             startTime.Unix(),
+		RequestModelName: testModel,
+		RequestAPIKeyName: "渠道测试",
+		ChannelId:        channel.ID,
+		ChannelName:      channel.Name,
+		ActualModelName:  testModel,
+		UseTime:          int(result.ResponseTimeMs),
+		Error:            result.Error,
+		Attempts: []model.ChannelAttempt{
+			{
+				ChannelID:   channel.ID,
+				ChannelName: channel.Name,
+				ModelName:   testModel,
+				AttemptNum:  1,
+				Status:      attemptStatus,
+				Duration:    int(result.ResponseTimeMs),
+				Msg:         attemptMsg,
+			},
+		},
+		TotalAttempts: 1,
+	}
+	if logErr := RelayLogAdd(ctx, testLog); logErr != nil {
+		log.Warnf("channel test log add failed: %d, error: %v", req.ChannelID, logErr)
+	}
+
 	return result
 }

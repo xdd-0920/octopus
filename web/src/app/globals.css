@@ -232,8 +232,8 @@ html.dark,
 
   /* ========== 移动端触控优化 ========== */
 
-  /* 增强触控区域 */
-  @media (pointer: coarse) {
+  /* 增强触控区域 - 使用屏幕宽度而非 pointer 媒体查询，避免开发者工具切换指针类型时触发布局抖动 */
+  @media (max-width: 768px) {
     button, a, [role="button"], select {
       min-height: 44px;
       min-width: 44px;
