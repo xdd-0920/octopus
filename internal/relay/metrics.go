@@ -159,6 +159,11 @@ func (m *RelayMetrics) saveLog(ctx context.Context, err error, duration time.Dur
 		relayLog.InputTokens = int(m.InternalResponse.Usage.PromptTokens)
 		relayLog.OutputTokens = int(m.InternalResponse.Usage.CompletionTokens)
 		relayLog.Cost = m.Stats.InputCost + m.Stats.OutputCost
+
+		// 缓存命中 Token
+		if m.InternalResponse.Usage.PromptTokensDetails != nil {
+			relayLog.CachedTokens = int(m.InternalResponse.Usage.PromptTokensDetails.CachedTokens)
+		}
 	}
 
 	// 请求内容

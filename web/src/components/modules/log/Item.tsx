@@ -235,7 +235,7 @@ export function LogCard({ log }: { log: RelayLog }) {
                                     <Pin className="size-3.5 shrink-0 text-amber-500" />
                                 )}
                             </div>
-                            <div className="grid grid-cols-2 md:grid-cols-7 gap-x-4 gap-y-2 text-xs tabular-nums text-muted-foreground">
+                            <div className="grid grid-cols-2 md:grid-cols-9 gap-x-4 gap-y-2 text-xs tabular-nums text-muted-foreground">
                                 <div className="flex items-center gap-1.5">
                                     <Clock className="size-3.5 shrink-0" style={{ color: brandColor }} />
                                     <span>{formatTime(log.time)}</span>
@@ -270,6 +270,18 @@ export function LogCard({ log }: { log: RelayLog }) {
                                         {t('cost')} {Number(log.cost).toFixed(6)}
                                     </span>
                                 </div>
+                                {log.cached_tokens > 0 && (
+                                    <>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-cyan-500">⚡</span>
+                                            <span>{t('cached')} {log.cached_tokens.toLocaleString()}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-cyan-500">%</span>
+                                            <span>{t('cacheRate')} {((log.cached_tokens / log.input_tokens) * 100).toFixed(1)}%</span>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                             {hasError && (
                                 <div className="p-2.5 rounded-xl bg-destructive/10 border border-destructive/20 overflow-hidden">
@@ -431,7 +443,7 @@ export function LogCard({ log }: { log: RelayLog }) {
                                                     {log.input_tokens.toLocaleString()} {t('tokens')}
                                                 </Badge>
                                             </div>
-                                            <div className="flex-1 overflow-auto min-h-0">
+                                            <div className="flex-1 overflow-auto min-h-0 custom-scrollbar">
                                                 <DeferredJsonContent content={log.request_content} fallbackText={t('noRequestContent')} />
                                             </div>
                                         </div>
@@ -443,7 +455,7 @@ export function LogCard({ log }: { log: RelayLog }) {
                                                     {log.output_tokens.toLocaleString()} {t('tokens')}
                                                 </Badge>
                                             </div>
-                                            <div className="flex-1 overflow-auto min-h-0">
+                                            <div className="flex-1 overflow-auto min-h-0 custom-scrollbar">
                                                 <DeferredJsonContent content={log.response_content} fallbackText={t('noResponseContent')} />
                                             </div>
                                         </div>
