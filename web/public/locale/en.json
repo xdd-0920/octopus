@@ -426,7 +426,8 @@
     },
     "log": {
         "list": {
-            "noMore": "No more logs"
+            "noMore": "No more logs",
+            "empty": "No log records"
         },
         "card": {
             "error": "Error",

@@ -6,6 +6,46 @@ import { LogCard } from './Item';
 import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { VirtualizedGrid } from '@/components/common/VirtualizedGrid';
+import { motion, AnimatePresence } from 'motion/react';
+
+/**
+ * 骨架屏组件
+ */
+function LogSkeleton({ count = 6 }: { count?: number }) {
+    return (
+        <div className="space-y-4 p-4">
+            {Array.from({ length: count }).map((_, i) => (
+                <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.05, duration: 0.3 }}
+                    className="rounded-3xl border bg-card p-4"
+                >
+                    <div className="flex items-center gap-4">
+                        <div className="h-10 w-10 rounded-full bg-muted animate-pulse" />
+                        <div className="flex-1 space-y-3">
+                            <div className="flex items-center gap-2">
+                                <div className="h-4 w-32 rounded bg-muted animate-pulse" />
+                                <div className="h-4 w-4 rounded bg-muted animate-pulse" />
+                                <div className="h-5 w-20 rounded-full bg-muted animate-pulse" />
+                                <div className="h-4 w-24 rounded bg-muted animate-pulse" />
+                            </div>
+                            <div className="grid grid-cols-7 gap-3">
+                                {Array.from({ length: 7 }).map((_, j) => (
+                                    <div key={j} className="flex items-center gap-1.5">
+                                        <div className="h-3.5 w-3.5 rounded bg-muted animate-pulse" />
+                                        <div className="h-3 flex-1 rounded bg-muted animate-pulse" />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </motion.div>
+            ))}
+        </div>
+    );
+}
 
 /**
  * 日志页面组件
@@ -41,42 +81,65 @@ export function Log() {
         return null;
     }, [hasMore, isLoading, isLoadingMore, logs.length, t]);
 
-    // 骨架屏加载状态
+    // 加载状态 - 显示骨架屏
     if (isLoading && logs.length === 0) {
+        return <LogSkeleton count={6} />;
+    }
+
+    // 空状态
+    if (!isLoading && logs.length === 0) {
         return (
-            <div className="space-y-4 p-4">
-                {Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="rounded-3xl border bg-card p-4 animate-pulse">
-                        <div className="flex items-center gap-4">
-                            <div className="h-10 w-10 rounded-full bg-muted" />
-                            <div className="flex-1 space-y-2">
-                                <div className="h-4 w-3/4 rounded bg-muted" />
-                                <div className="grid grid-cols-7 gap-4">
-                                    {Array.from({ length: 7 }).map((_, j) => (
-                                        <div key={j} className="h-3 rounded bg-muted" />
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
+            <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.3 }}
+                className="flex flex-col items-center justify-center h-64 gap-4"
+            >
+                <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="32"
+                        height="32"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="text-muted-foreground"
+                    >
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                    </svg>
+                </div>
+                <p className="text-muted-foreground text-sm">{t('list.empty')}</p>
+            </motion.div>
         );
     }
 
     return (
-        <VirtualizedGrid
-            items={logs}
-            layout="list"
-            columns={{ default: 1 }}
-            estimateItemHeight={80}
-            overscan={4}
-            getItemKey={(log) => `log-${log.id}`}
-            renderItem={(log) => <LogCard log={log} />}
-            footer={footer}
-            onReachEnd={handleReachEnd}
-            reachEndEnabled={canLoadMore}
-            reachEndOffset={2}
-        />
+        <AnimatePresence mode="wait">
+            <motion.div
+                key="log-list"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.2 }}
+                className="h-full"
+            >
+                <VirtualizedGrid
+                    items={logs}
+                    layout="list"
+                    columns={{ default: 1 }}
+                    estimateItemHeight={80}
+                    overscan={4}
+                    getItemKey={(log) => `log-${log.id}`}
+                    renderItem={(log) => <LogCard log={log} />}
+                    footer={footer}
+                    onReachEnd={handleReachEnd}
+                    reachEndEnabled={canLoadMore}
+                    reachEndOffset={2}
+                />
+            </motion.div>
+        </AnimatePresence>
     );
 }
