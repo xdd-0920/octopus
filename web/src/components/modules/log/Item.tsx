@@ -99,88 +99,146 @@ function RetryBadgeWithTooltip({ channelName, brandColor, attempts }: RetryBadge
     );
 }
 
-function DeferredJsonContent({ content, fallbackText }: { content: string | undefined; fallbackText: string }) {
+// 自动加载详情的内容组件
+function LogDetailContent({ logId }: { logId: number }) {
+    const t = useTranslations('log.card');
     const { resolvedTheme } = useTheme();
     const { isOpen } = useMorphingDialog();
+    const [fullLog, setFullLog] = useState<RelayLog | null>(null);
+    const [isLoadingDetail, setIsLoadingDetail] = useState(false);
     const [shouldRender, setShouldRender] = useState(false);
 
-    const parsed = useMemo(() => {
-        if (!content) return { isJson: false, data: null };
-        try {
-            return { isJson: true, data: JSON.parse(content) };
-        } catch {
-            return { isJson: false, data: content };
-        }
-    }, [content]);
-
+    // 对话框打开时自动加载详情
     useEffect(() => {
-        if (isOpen) {
+        if (isOpen && !fullLog && !isLoadingDetail) {
+            setIsLoadingDetail(true);
+            getLogDetail(logId)
+                .then((detail) => setFullLog(detail))
+                .catch((error) => console.error('加载日志详情失败:', error))
+                .finally(() => setIsLoadingDetail(false));
+        }
+    }, [isOpen, logId, fullLog, isLoadingDetail]);
+
+    // 延迟渲染 JSON 内容
+    useEffect(() => {
+        if (isOpen && fullLog) {
             const timer = setTimeout(() => setShouldRender(true), 300);
             return () => clearTimeout(timer);
         }
-    }, [isOpen]);
+    }, [isOpen, fullLog]);
 
     if (!isOpen) {
         if (shouldRender) setShouldRender(false);
         return null;
     }
 
-    if (!content) {
+    const requestContent = fullLog?.request_content;
+    const responseContent = fullLog?.response_content;
+
+    const renderJsonContent = (content: string | undefined, fallbackText: string) => {
+        if (!content) {
+            return (
+                <pre className="p-4 text-xs text-muted-foreground whitespace-pre-wrap wrap-break-word leading-relaxed">
+                    {fallbackText}
+                </pre>
+            );
+        }
+
+        let parsed;
+        let isJson = false;
+        try {
+            parsed = JSON.parse(content);
+            isJson = true;
+        } catch {
+            parsed = content;
+        }
+
         return (
-            <pre className="p-4 text-xs text-muted-foreground whitespace-pre-wrap wrap-break-word leading-relaxed">
-                {fallbackText}
-            </pre>
+            <AnimatePresence mode="wait">
+                {!shouldRender ? (
+                    <motion.div
+                        key="loading"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.15 }}
+                        className="p-4 flex items-center justify-center h-full"
+                    >
+                        <Loader2 className="h-5 w-5 text-muted-foreground animate-spin" />
+                    </motion.div>
+                ) : isJson ? (
+                    <motion.div
+                        key="json"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="p-4"
+                    >
+                        <JsonView
+                            value={parsed as object}
+                            style={{
+                                ...(resolvedTheme === 'dark' ? githubDarkTheme : githubLightTheme),
+                                fontSize: '12px',
+                                fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+                                backgroundColor: 'transparent',
+                            }}
+                            displayDataTypes={false}
+                            displayObjectSize={false}
+                            collapsed={false}
+                        />
+                    </motion.div>
+                ) : (
+                    <motion.pre
+                        key="text"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="p-4 text-xs text-muted-foreground whitespace-pre-wrap wrap-break-word font-mono leading-relaxed"
+                    >
+                        {content}
+                    </motion.pre>
+                )}
+            </AnimatePresence>
         );
-    }
+    };
 
     return (
-        <AnimatePresence mode="wait">
-            {!shouldRender ? (
-                <motion.div
-                    key="loading"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15 }}
-                    className="p-4 flex items-center justify-center h-full"
-                >
-                    <Loader2 className="h-5 w-5 text-muted-foreground animate-spin" />
-                </motion.div>
-            ) : parsed.isJson ? (
-                <motion.div
-                    key="json"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="p-4"
-                >
-                    <JsonView
-                        value={parsed.data as object}
-                        style={{
-                            ...(resolvedTheme === 'dark' ? githubDarkTheme : githubLightTheme),
-                            fontSize: '12px',
-                            fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
-                            backgroundColor: 'transparent',
-                        }}
-                        displayDataTypes={false}
-                        displayObjectSize={false}
-                        collapsed={false}
-                    />
-                </motion.div>
-            ) : (
-                <motion.pre
-                    key="text"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="p-4 text-xs text-muted-foreground whitespace-pre-wrap wrap-break-word font-mono leading-relaxed"
-                >
-                    {content}
-                </motion.pre>
-            )}
-        </AnimatePresence>
+        <div className="flex-1 min-h-0 overflow-hidden">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full min-h-0">
+                <div className="flex flex-col rounded-2xl border border-border bg-muted/30 overflow-hidden min-h-0">
+                    <div className="flex items-center gap-2 px-3 md:px-4 py-2.5 md:py-3 border-b border-border bg-muted/50 shrink-0">
+                        <Send className="size-4 text-green-500" />
+                        <span className="text-sm font-medium text-card-foreground">{t('requestContent')}</span>
+                    </div>
+                    <div className="flex-1 overflow-auto min-h-0 custom-scrollbar">
+                        {isLoadingDetail ? (
+                            <div className="flex items-center justify-center h-full">
+                                <Loader2 className="h-5 w-5 text-muted-foreground animate-spin" />
+                            </div>
+                        ) : (
+                            renderJsonContent(requestContent, t('noRequestContent'))
+                        )}
+                    </div>
+                </div>
+                <div className="flex flex-col rounded-2xl border border-border bg-muted/30 overflow-hidden min-h-0">
+                    <div className="flex items-center gap-2 px-3 md:px-4 py-2.5 md:py-3 border-b border-border bg-muted/50 shrink-0">
+                        <MessageSquare className="size-4 text-purple-500" />
+                        <span className="text-sm font-medium text-card-foreground">{t('responseContent')}</span>
+                    </div>
+                    <div className="flex-1 overflow-auto min-h-0 custom-scrollbar">
+                        {isLoadingDetail ? (
+                            <div className="flex items-center justify-center h-full">
+                                <Loader2 className="h-5 w-5 text-muted-foreground animate-spin" />
+                            </div>
+                        ) : (
+                            renderJsonContent(responseContent, t('noResponseContent'))
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 }
 
@@ -195,23 +253,6 @@ export function LogCard({ log }: { log: RelayLogListItem }) {
     const hasError = !!log.error;
     const hasMultipleAttempts = log.attempts && log.attempts.length > 1;
     const [isDiagnosticExpanded, setIsDiagnosticExpanded] = useState(false);
-    const [fullLog, setFullLog] = useState<RelayLog | null>(null);
-    const [isLoadingDetail, setIsLoadingDetail] = useState(false);
-
-    // 加载完整日志详情
-    const loadFullLog = async () => {
-        if (fullLog || isLoadingDetail) return;
-        
-        setIsLoadingDetail(true);
-        try {
-            const detail = await getLogDetail(log.id);
-            setFullLog(detail);
-        } catch (error) {
-            console.error('加载日志详情失败:', error);
-        } finally {
-            setIsLoadingDetail(false);
-        }
-    };
 
     return (
         <TooltipProvider>
@@ -450,64 +491,7 @@ export function LogCard({ log }: { log: RelayLogListItem }) {
                                         </AnimatePresence>
                                     </div>
                                 )}
-                                <div className="flex-1 min-h-0 overflow-hidden">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full min-h-0">
-                                        <div className="flex flex-col rounded-2xl border border-border bg-muted/30 overflow-hidden min-h-0">
-                                            <div className="flex items-center gap-2 px-3 md:px-4 py-2.5 md:py-3 border-b border-border bg-muted/50 shrink-0">
-                                                <Send className="size-4 text-green-500" />
-                                                <span className="text-sm font-medium text-card-foreground">{t('requestContent')}</span>
-                                                <Badge variant="secondary" className="ml-auto text-xs">
-                                                    {log.input_tokens.toLocaleString()} {t('tokens')}
-                                                </Badge>
-                                            </div>
-                                            <div className="flex-1 overflow-auto min-h-0 custom-scrollbar">
-                                                {isLoadingDetail ? (
-                                                    <div className="flex items-center justify-center h-full">
-                                                        <Loader2 className="h-5 w-5 text-muted-foreground animate-spin" />
-                                                    </div>
-                                                ) : fullLog?.request_content ? (
-                                                    <DeferredJsonContent content={fullLog.request_content} fallbackText={t('noRequestContent')} />
-                                                ) : (
-                                                    <div className="flex items-center justify-center h-full">
-                                                        <button 
-                                                            onClick={loadFullLog}
-                                                            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                                                        >
-                                                            {t('clickToLoadContent')}
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="flex flex-col rounded-2xl border border-border bg-muted/30 overflow-hidden min-h-0">
-                                            <div className="flex items-center gap-2 px-3 md:px-4 py-2.5 md:py-3 border-b border-border bg-muted/50 shrink-0">
-                                                <MessageSquare className="size-4 text-purple-500" />
-                                                <span className="text-sm font-medium text-card-foreground">{t('responseContent')}</span>
-                                                <Badge variant="secondary" className="ml-auto text-xs">
-                                                    {log.output_tokens.toLocaleString()} {t('tokens')}
-                                                </Badge>
-                                            </div>
-                                            <div className="flex-1 overflow-auto min-h-0 custom-scrollbar">
-                                                {isLoadingDetail ? (
-                                                    <div className="flex items-center justify-center h-full">
-                                                        <Loader2 className="h-5 w-5 text-muted-foreground animate-spin" />
-                                                    </div>
-                                                ) : fullLog?.response_content ? (
-                                                    <DeferredJsonContent content={fullLog.response_content} fallbackText={t('noResponseContent')} />
-                                                ) : (
-                                                    <div className="flex items-center justify-center h-full">
-                                                        <button 
-                                                            onClick={loadFullLog}
-                                                            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                                                        >
-                                                            {t('clickToLoadContent')}
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                <LogDetailContent logId={log.id} />
                             </div>
                         </MorphingDialogDescription>
 
