@@ -132,6 +132,16 @@ export function VirtualizedGrid<T>({
 
     const virtualRows = rowVirtualizer.getVirtualItems();
 
+    // 当 itemRowCount 增加时（新数据加载完成），重置 reachEndTriggeredRef
+    // 这样下次滚动到底部时可以再次触发加载
+    const prevItemCountRef = useRef(itemRowCount);
+    useEffect(() => {
+        if (itemRowCount > prevItemCountRef.current) {
+            reachEndTriggeredRef.current = false;
+        }
+        prevItemCountRef.current = itemRowCount;
+    }, [itemRowCount]);
+
     useEffect(() => {
         if (!onReachEnd || !reachEndEnabled || itemRowCount === 0) return;
 
