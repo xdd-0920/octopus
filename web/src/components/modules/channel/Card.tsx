@@ -66,12 +66,6 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
         );
     };
 
-    const splitModels = (models: string) =>
-        models
-            .split(',')
-            .map((item) => item.trim())
-            .filter(Boolean);
-
     const modelCount = new Set([
         ...splitModels(channel.model),
         ...splitModels(channel.custom_model),
