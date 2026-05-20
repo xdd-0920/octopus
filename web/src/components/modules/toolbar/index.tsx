@@ -193,7 +193,7 @@ export function Toolbar() {
                     ) : (
                         <motion.div
                             layoutId="search-box"
-                            className="absolute right-0 top-0 flex items-center gap-1 h-9 px-2 rounded-xl border bg-card"
+                            className="absolute right-0 top-0 flex items-center gap-1 h-9 px-2 rounded-xl border bg-card shadow-sm z-10"
                             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                         >
                             <motion.span layout="position"><Search className="size-4 text-muted-foreground shrink-0" /></motion.span>
@@ -208,7 +208,7 @@ export function Toolbar() {
                                 }}
                                 autoFocus
                                 placeholder={t('popover.searchPlaceholder') || '搜索...'}
-                                className="w-24 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                                className="w-24 sm:w-32 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                             />
                             {inputValue && (
                                 <button
@@ -229,7 +229,8 @@ export function Toolbar() {
                     )}
                 </div>
 
-                <Popover>
+                <div className={cn("flex items-center gap-2", searchExpanded && "hidden sm:flex")}>
+                    <Popover>
                     <PopoverTrigger asChild>
                         <button
                             type="button"
@@ -366,17 +367,18 @@ export function Toolbar() {
                 </Popover>
 
                 {/* 创建按钮 */}
-                <MorphingDialog>
-                    <MorphingDialogTrigger className={buttonVariants({ variant: "ghost", size: "icon", className: "rounded-xl transition-none hover:bg-transparent text-muted-foreground hover:text-foreground" })}>
-                        <Plus className="size-4 transition-colors duration-300" />
-                    </MorphingDialogTrigger>
+                    <MorphingDialog>
+                        <MorphingDialogTrigger className={buttonVariants({ variant: "ghost", size: "icon", className: "rounded-xl transition-none hover:bg-transparent text-muted-foreground hover:text-foreground" })}>
+                            <Plus className="size-4 transition-colors duration-300" />
+                        </MorphingDialogTrigger>
 
-                    <MorphingDialogContainer>
-                        <MorphingDialogContent className="w-fit max-w-full bg-card text-card-foreground px-6 py-4 rounded-3xl custom-shadow max-h-[calc(100vh-2rem)] flex flex-col overflow-hidden">
-                            <CreateDialogContent activeItem={toolbarItem} />
-                        </MorphingDialogContent>
-                    </MorphingDialogContainer>
-                </MorphingDialog>
+                        <MorphingDialogContainer>
+                            <MorphingDialogContent className="w-fit max-w-full bg-card text-card-foreground px-6 py-4 rounded-3xl custom-shadow max-h-[calc(100vh-2rem)] flex flex-col overflow-hidden">
+                                <CreateDialogContent activeItem={toolbarItem} />
+                            </MorphingDialogContent>
+                        </MorphingDialogContainer>
+                    </MorphingDialog>
+                </div>
             </motion.div>
         </AnimatePresence>
     );

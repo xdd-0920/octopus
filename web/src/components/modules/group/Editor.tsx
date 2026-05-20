@@ -346,9 +346,9 @@ export function GroupEditor({
 
 
     return (
-        <form onSubmit={handleSubmit} className="flex flex-col h-full min-h-0 ">
-            <div className="flex-1 min-h-0 overflow-hidden pr-1">
-                <FieldGroup className="gap-4 flex flex-col min-h-0 h-full">
+        <form onSubmit={handleSubmit} className="flex flex-col md:h-full md:min-h-0">
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-1">
+                <FieldGroup className="gap-4 flex flex-col md:min-h-0 md:h-full">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <Field>
                             <FieldLabel htmlFor="group-name">{t('form.name')}</FieldLabel>
@@ -462,7 +462,7 @@ export function GroupEditor({
                     </div>
 
                     <div className="flex-1 min-h-0">
-                        <div className="flex flex-col md:grid md:grid-cols-2 gap-4 h-full min-h-0">
+                        <div className="flex flex-col md:grid md:grid-cols-2 gap-4 md:h-full md:min-h-0">
                             <ModelPickerSection
                                 modelChannels={modelChannels}
                                 selectedMembers={selectedMembers}

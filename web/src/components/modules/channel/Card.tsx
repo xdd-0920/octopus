@@ -4,9 +4,9 @@ import {
     MorphingDialogContainer,
     MorphingDialogContent,
 } from '@/components/ui/morphing-dialog';
-import { CheckCircle2, DollarSign, Key, Layers, MessageSquare, XCircle, PlugZap, Loader2, ChevronDown, Copy, Check } from 'lucide-react';
+import { CheckCircle2, DollarSign, Key, Layers, MessageSquare, XCircle, PlugZap, Loader2, ChevronDown } from 'lucide-react';
 import { type StatsMetricsFormatted } from '@/api/endpoints/stats';
-import { type Channel, type ChannelTestResult, useEnableChannel, useTestChannel } from '@/api/endpoints/channel';
+import { type Channel, useEnableChannel, useTestChannel } from '@/api/endpoints/channel';
 import { CardContent } from './CardContent';
 import { useTranslations } from 'next-intl';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/animate-ui/components/animate/tooltip';
@@ -24,10 +24,7 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
     const isListLayout = layout === 'list';
     const [selectedModel, setSelectedModel] = useState<string>('');
     const [showModelDropdown, setShowModelDropdown] = useState(false);
-    const [testResult, setTestResult] = useState<{ result: ChannelTestResult; model: string } | null>(null);
-    const [copiedField, setCopiedField] = useState<string | null>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
-    const resultRef = useRef<HTMLDivElement>(null);
 
     const splitModels = (models: string) =>
         models
@@ -45,32 +42,18 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
                 setShowModelDropdown(false);
             }
-            if (resultRef.current && !resultRef.current.contains(event.target as Node)) {
-                setTestResult(null);
-            }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
-
-    const handleCopy = async (text: string, field: string) => {
-        try {
-            await navigator.clipboard.writeText(text);
-            setCopiedField(field);
-            setTimeout(() => setCopiedField(null), 2000);
-        } catch {
-            toast.error('复制失败');
-        }
-    };
 
     const runTest = (model?: string) => {
         testChannel.mutate(
             { channel_id: channel.id, model },
             {
                 onSuccess: (result) => {
-                    setTestResult({ result, model: model || '默认模型' });
                     if (result.success) {
-                        toast.success(`测试通过 (${result.response_time_ms}ms)`);
+                        toast.success(`测试通过${result.response_time_ms ? ` (${result.response_time_ms}ms)` : ''}`);
                     } else {
                         toast.error(result.error || '测试失败');
                     }
@@ -154,66 +137,6 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
                                                 {model}
                                             </div>
                                         ))}
-                                    </div>
-                                )}
-                                {testResult && (
-                                    <div
-                                        ref={resultRef}
-                                        className="absolute right-0 top-full mt-1 z-[100] w-[320px] rounded-xl border border-border bg-card shadow-xl overflow-hidden"
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        {/* Header */}
-                                        <div className={`flex items-center gap-2 px-3 py-2 ${testResult.result.success ? 'bg-emerald-500/10' : 'bg-destructive/10'}`}>
-                                            {testResult.result.success ? (
-                                                <CheckCircle2 className="size-4 text-emerald-500" />
-                                            ) : (
-                                                <XCircle className="size-4 text-destructive" />
-                                            )}
-                                            <span className={`text-sm font-medium ${testResult.result.success ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
-                                                {testResult.result.success ? '测试通过' : '测试失败'}
-                                            </span>
-                                            <span className="ml-auto text-xs text-muted-foreground">{testResult.model}</span>
-                                        </div>
-
-                                        {/* Details */}
-                                        <div className="p-3 space-y-2.5">
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <div className="rounded-lg bg-muted/50 px-2.5 py-1.5">
-                                                    <div className="text-[10px] text-muted-foreground">状态码</div>
-                                                    <div className="text-sm font-semibold">{testResult.result.status_code || '-'}</div>
-                                                </div>
-                                                <div className="rounded-lg bg-muted/50 px-2.5 py-1.5">
-                                                    <div className="text-[10px] text-muted-foreground">响应时间</div>
-                                                    <div className="text-sm font-semibold">{testResult.result.response_time_ms}ms</div>
-                                                </div>
-                                            </div>
-
-                                            {testResult.result.response && (
-                                                <div className="space-y-1">
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="text-xs text-muted-foreground">返回内容</span>
-                                                        <button
-                                                            onClick={() => handleCopy(testResult.result.response || '', 'response')}
-                                                            className="p-0.5 rounded text-muted-foreground hover:text-foreground transition-colors"
-                                                        >
-                                                            {copiedField === 'response' ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
-                                                        </button>
-                                                    </div>
-                                                    <pre className="text-xs bg-muted/30 rounded-lg p-2 max-h-[120px] overflow-auto whitespace-pre-wrap break-all font-mono">
-                                                        {testResult.result.response}
-                                                    </pre>
-                                                </div>
-                                            )}
-
-                                            {testResult.result.error && (
-                                                <div className="space-y-1">
-                                                    <span className="text-xs text-destructive">错误信息</span>
-                                                    <pre className="text-xs bg-destructive/5 rounded-lg p-2 max-h-[80px] overflow-auto whitespace-pre-wrap break-all text-destructive/80">
-                                                        {testResult.result.error}
-                                                    </pre>
-                                                </div>
-                                            )}
-                                        </div>
                                     </div>
                                 )}
                             </div>
