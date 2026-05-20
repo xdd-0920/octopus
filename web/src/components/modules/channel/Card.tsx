@@ -139,18 +139,7 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
                                     )}
                                 </button>
                                 {showModelDropdown && allModels.length > 0 && (
-                                    <div className="absolute right-0 top-full mt-1 z-50 min-w-[150px] rounded-xl border border-border bg-card shadow-lg py-1 max-h-[200px] overflow-y-auto">
-                                        <div
-                                            className="px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent cursor-pointer"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setSelectedModel('');
-                                                setShowModelDropdown(false);
-                                                runTest();
-                                            }}
-                                        >
-                                            默认模型
-                                        </div>
+                                    <div className="absolute right-0 top-full mt-1 z-[100] min-w-[150px] rounded-xl border border-border bg-card shadow-lg py-1 max-h-[200px] overflow-y-auto">
                                         {allModels.map((model) => (
                                             <div
                                                 key={model}
@@ -170,7 +159,7 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
                                 {testResult && (
                                     <div
                                         ref={resultRef}
-                                        className="absolute right-0 top-full mt-1 z-50 w-[320px] rounded-xl border border-border bg-card shadow-xl overflow-hidden"
+                                        className="absolute right-0 top-full mt-1 z-[100] w-[320px] rounded-xl border border-border bg-card shadow-xl overflow-hidden"
                                         onClick={(e) => e.stopPropagation()}
                                     >
                                         {/* Header */}

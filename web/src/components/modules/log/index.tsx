@@ -1,9 +1,9 @@
 'use client';
 
-import { useCallback, useMemo, useState, useRef } from 'react';
-import { useLogs, type LogSearchFilters } from '@/api/endpoints/log';
+import { useCallback, useMemo } from 'react';
+import { useLogs } from '@/api/endpoints/log';
 import { LogCard } from './Item';
-import { Loader2, Search, X } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { VirtualizedGrid } from '@/components/common/VirtualizedGrid';
 import { motion, AnimatePresence } from 'motion/react';
@@ -48,92 +48,20 @@ function LogSkeleton({ count = 6 }: { count?: number }) {
 }
 
 /**
- * 日志搜索栏
- */
-function LogSearchBar({ onSearch }: { onSearch: (filters: LogSearchFilters) => void }) {
-    const t = useTranslations('log');
-    const [modelName, setModelName] = useState('');
-    const [apiKeyName, setApiKeyName] = useState('');
-    const [keyword, setKeyword] = useState('');
-    const timerRef = useRef<ReturnType<typeof setTimeout>>(null);
-
-    const doSearch = useCallback(() => {
-        if (timerRef.current) clearTimeout(timerRef.current);
-        timerRef.current = setTimeout(() => {
-            onSearch({
-                modelName: modelName.trim() || undefined,
-                apiKeyName: apiKeyName.trim() || undefined,
-                keyword: keyword.trim() || undefined,
-            });
-        }, 300);
-    }, [modelName, apiKeyName, keyword, onSearch]);
-
-    const clearAll = useCallback(() => {
-        setModelName('');
-        setApiKeyName('');
-        setKeyword('');
-        onSearch({});
-    }, [onSearch]);
-
-    const hasFilters = modelName || apiKeyName || keyword;
-
-    return (
-        <div className="flex flex-wrap items-center gap-2 p-3 bg-card rounded-2xl border border-border">
-            <Search className="size-4 text-muted-foreground shrink-0" />
-            <input
-                type="text"
-                placeholder={t('search.modelName')}
-                value={modelName}
-                onChange={(e) => { setModelName(e.target.value); doSearch(); }}
-                className="flex-1 min-w-[120px] bg-transparent border-none outline-none text-sm placeholder:text-muted-foreground/50"
-            />
-            <input
-                type="text"
-                placeholder={t('search.apiKeyName')}
-                value={apiKeyName}
-                onChange={(e) => { setApiKeyName(e.target.value); doSearch(); }}
-                className="flex-1 min-w-[120px] bg-transparent border-none outline-none text-sm placeholder:text-muted-foreground/50"
-            />
-            <input
-                type="text"
-                placeholder={t('search.keyword')}
-                value={keyword}
-                onChange={(e) => { setKeyword(e.target.value); doSearch(); }}
-                className="flex-1 min-w-[100px] bg-transparent border-none outline-none text-sm placeholder:text-muted-foreground/50"
-            />
-            {hasFilters && (
-                <button
-                    onClick={clearAll}
-                    className="shrink-0 p-1 rounded-lg hover:bg-muted transition-colors"
-                >
-                    <X className="size-4 text-muted-foreground" />
-                </button>
-            )}
-        </div>
-    );
-}
-
-/**
  * 日志页面组件
  * - 初始加载 pageSize 条历史日志
  * - SSE 实时推送新日志
  * - 滚动自动加载更多
- * - 搜索过滤
  */
 export function Log() {
     const t = useTranslations('log');
-    const [searchFilters, setSearchFilters] = useState<LogSearchFilters>({});
-    const { logs, hasMore, isLoading, isLoadingMore, loadMore } = useLogs({ pageSize: 20, search: searchFilters });
+    const { logs, hasMore, isLoading, isLoadingMore, loadMore } = useLogs({ pageSize: 20 });
 
     const canLoadMore = hasMore && !isLoading && !isLoadingMore && logs.length > 0;
     const handleReachEnd = useCallback(() => {
         if (!canLoadMore) return;
         void loadMore();
     }, [canLoadMore, loadMore]);
-
-    const handleSearch = useCallback((filters: LogSearchFilters) => {
-        setSearchFilters(filters);
-    }, []);
 
     const footer = useMemo(() => {
         if (hasMore && (isLoading || isLoadingMore)) {
@@ -161,7 +89,6 @@ export function Log() {
                 animate={{ opacity: 1 }}
                 className="h-full flex flex-col gap-4"
             >
-                <LogSearchBar onSearch={handleSearch} />
                 <LogSkeleton count={6} />
             </motion.div>
         );
@@ -175,7 +102,6 @@ export function Log() {
                 animate={{ opacity: 1 }}
                 className="h-full flex flex-col gap-4"
             >
-                <LogSearchBar onSearch={handleSearch} />
                 <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -214,7 +140,6 @@ export function Log() {
                 transition={{ duration: 0.2 }}
                 className="h-full flex flex-col gap-2"
             >
-                <LogSearchBar onSearch={handleSearch} />
                 <div className="flex-1 min-h-0">
                     <VirtualizedGrid
                         items={logs}

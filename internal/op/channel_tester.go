@@ -73,11 +73,20 @@ func TestChannel(ctx context.Context, req model.ChannelTestRequest) model.Channe
 		}
 	}
 
-	// 构建测试消息
+	// 构建测试消息（必须包含 messages 字段）
 	stream := false
+	testContent := "Hello"
 	testReq := &transformerModel.InternalLLMRequest{
 		Stream: &stream,
 		Model:  testModel,
+		Messages: []transformerModel.Message{
+			{
+				Role: "user",
+				Content: transformerModel.MessageContent{
+					Content: &testContent,
+				},
+			},
+		},
 	}
 
 	// 构建 HTTP 请求

@@ -76,7 +76,7 @@ function ModelPickerSection({
     }, [channels, normalizedSearch]);
 
     return (
-        <div className="rounded-xl border border-border/50 bg-muted/30 flex flex-col min-h-0">
+        <div className="rounded-xl border border-border/50 bg-muted/30 flex flex-col min-h-[200px] md:min-h-0">
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 py-2 border-b border-border/30 bg-muted/50">
                 <span className="min-w-0 justify-self-start text-sm font-medium text-foreground">
                     {t('form.addItem')}
@@ -192,7 +192,7 @@ function SortSection({
     const t = useTranslations('group');
 
     return (
-        <div className="rounded-xl border border-border/50 bg-muted/30 flex flex-col min-h-0">
+        <div className="rounded-xl border border-border/50 bg-muted/30 flex flex-col min-h-[200px] md:min-h-0">
             <div className="flex items-center justify-between px-3 py-2 border-b border-border/30 bg-muted/50">
                 <span className="text-sm font-medium text-foreground">
                     {t('form.items')}
@@ -462,7 +462,7 @@ export function GroupEditor({
                     </div>
 
                     <div className="flex-1 min-h-0">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full min-h-0">
+                        <div className="flex flex-col md:grid md:grid-cols-2 gap-4 h-full min-h-0">
                             <ModelPickerSection
                                 modelChannels={modelChannels}
                                 selectedMembers={selectedMembers}
