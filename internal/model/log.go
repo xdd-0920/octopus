@@ -45,6 +45,10 @@ type RelayLog struct {
 }
 
 // RelayLogListItem 用于列表查询，不包含大文本字段
+func (RelayLogListItem) TableName() string {
+	return "relay_logs"
+}
+
 type RelayLogListItem struct {
 	ID                int64            `json:"id" gorm:"primaryKey;autoIncrement:false"` // Snowflake ID
 	Time              int64            `json:"time"`                                     // 时间戳（秒）
