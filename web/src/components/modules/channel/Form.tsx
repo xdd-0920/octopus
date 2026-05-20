@@ -287,7 +287,7 @@ export function ChannelForm({
                                 onChange={(e) => handleUpdateBaseUrl(idx, { url: e.target.value })}
                                 placeholder={t('baseUrlUrl')}
                                 required={idx === 0}
-                                className="rounded-xl flex-1"
+                                className="rounded-xl flex-1 min-w-0"
                             />
                             <Button
                                 type="button"
@@ -295,7 +295,7 @@ export function ChannelForm({
                                 size="sm"
                                 onClick={() => handleRemoveBaseUrl(idx)}
                                 disabled={(formData.base_urls ?? []).length <= 1}
-                                className="h-8 w-8 p-0 rounded-xl text-muted-foreground hover:text-destructive disabled:opacity-40 hover:bg-transparent"
+                                className="h-8 w-8 p-0 rounded-xl text-muted-foreground hover:text-destructive disabled:opacity-40 hover:bg-transparent shrink-0"
                                 title="Remove"
                             >
                                 <X className="h-4 w-4" />
@@ -323,37 +323,39 @@ export function ChannelForm({
                 </div>
                 <div className="space-y-2">
                     {(formData.keys ?? []).map((k, idx) => (
-                        <div key={k.id ?? `new-${idx}`} className="flex items-center gap-2">
-                            <Input
-                                type="text"
-                                value={k.channel_key}
-                                onChange={(e) => handleUpdateKey(idx, { channel_key: e.target.value })}
-                                placeholder={t('apiKey')}
-                                required={idx === 0}
-                                className="rounded-xl flex-1"
-                            />
+                        <div key={k.id ?? `new-${idx}`} className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                            <div className="flex items-center gap-2 w-full sm:flex-1">
+                                <Input
+                                    type="text"
+                                    value={k.channel_key}
+                                    onChange={(e) => handleUpdateKey(idx, { channel_key: e.target.value })}
+                                    placeholder={t('apiKey')}
+                                    required={idx === 0}
+                                    className="rounded-xl flex-1"
+                                />
+                                <Switch
+                                    checked={k.enabled}
+                                    onCheckedChange={(checked) => handleUpdateKey(idx, { enabled: checked })}
+                                />
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRemoveKey(idx)}
+                                    disabled={(formData.keys ?? []).length <= 1}
+                                    className="h-8 w-8 p-0 rounded-xl text-muted-foreground hover:text-destructive hover:bg-transparent disabled:opacity-40 shrink-0"
+                                    title="Remove"
+                                >
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            </div>
                             <Input
                                 type="text"
                                 value={k.remark ?? ''}
                                 onChange={(e) => handleUpdateKey(idx, { remark: e.target.value })}
                                 placeholder={t('remark')}
-                                className="rounded-xl w-32"
+                                className="rounded-xl w-full sm:w-32"
                             />
-                            <Switch
-                                checked={k.enabled}
-                                onCheckedChange={(checked) => handleUpdateKey(idx, { enabled: checked })}
-                            />
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRemoveKey(idx)}
-                                disabled={(formData.keys ?? []).length <= 1}
-                                className="h-8 w-8 p-0 rounded-xl text-muted-foreground hover:text-destructive hover:bg-transparent disabled:opacity-40"
-                                title="Remove"
-                            >
-                                <X className="h-4 w-4" />
-                            </Button>
                         </div>
                     ))}
                 </div>
@@ -517,32 +519,34 @@ export function ChannelForm({
                             </div>
                             <div className="space-y-2">
                                 {(formData.custom_header ?? []).map((h, idx) => (
-                                    <div key={`hdr-${idx}`} className="flex items-center gap-2">
-                                        <Input
-                                            type="text"
-                                            value={h.header_key}
-                                            onChange={(e) => handleUpdateHeader(idx, { header_key: e.target.value })}
-                                            placeholder={t('customHeaderKey')}
-                                            className="rounded-xl flex-1"
-                                        />
+                                    <div key={`hdr-${idx}`} className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                                        <div className="flex items-center gap-2 w-full sm:flex-1">
+                                            <Input
+                                                type="text"
+                                                value={h.header_key}
+                                                onChange={(e) => handleUpdateHeader(idx, { header_key: e.target.value })}
+                                                placeholder={t('customHeaderKey')}
+                                                className="rounded-xl flex-1 min-w-0"
+                                            />
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => handleRemoveHeader(idx)}
+                                                disabled={(formData.custom_header ?? []).length <= 1}
+                                                className="h-8 w-8 p-0 rounded-xl text-muted-foreground hover:text-destructive hover:bg-transparent disabled:opacity-40 shrink-0"
+                                                title="Remove"
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </Button>
+                                        </div>
                                         <Input
                                             type="text"
                                             value={h.header_value}
                                             onChange={(e) => handleUpdateHeader(idx, { header_value: e.target.value })}
                                             placeholder={t('customHeaderValue')}
-                                            className="rounded-xl flex-1"
+                                            className="rounded-xl w-full sm:flex-1"
                                         />
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => handleRemoveHeader(idx)}
-                                            disabled={(formData.custom_header ?? []).length <= 1}
-                                            className="h-8 w-8 p-0 rounded-xl text-muted-foreground hover:text-destructive hover:bg-transparent disabled:opacity-40"
-                                            title="Remove"
-                                        >
-                                            <X className="h-4 w-4" />
-                                        </Button>
                                     </div>
                                 ))}
                             </div>
@@ -578,30 +582,28 @@ export function ChannelForm({
                 </AccordionItem>
             </Accordion>
 
-            <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-muted/20 border border-border/50">
-                <label className="flex items-center gap-2 cursor-pointer">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-xl bg-muted/20 border border-border/50">
+                <label className="flex items-center gap-3 cursor-pointer">
                     <Switch
                         checked={formData.enabled}
                         onCheckedChange={(checked) => onFormDataChange({ ...formData, enabled: checked })}
                     />
                     <span className="text-sm font-medium text-card-foreground">{t('enabled')}</span>
                 </label>
-                <div className="flex items-center gap-6">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                        <Switch
-                            checked={formData.proxy}
-                            onCheckedChange={(checked) => onFormDataChange({ ...formData, proxy: checked })}
-                        />
-                        <span className="text-sm text-card-foreground">{t('proxy')}</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                        <Switch
-                            checked={formData.auto_sync}
-                            onCheckedChange={(checked) => onFormDataChange({ ...formData, auto_sync: checked })}
-                        />
-                        <span className="text-sm text-card-foreground">{t('autoSync')}</span>
-                    </label>
-                </div>
+                <label className="flex items-center gap-3 cursor-pointer">
+                    <Switch
+                        checked={formData.proxy}
+                        onCheckedChange={(checked) => onFormDataChange({ ...formData, proxy: checked })}
+                    />
+                    <span className="text-sm text-card-foreground">{t('proxy')}</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                    <Switch
+                        checked={formData.auto_sync}
+                        onCheckedChange={(checked) => onFormDataChange({ ...formData, auto_sync: checked })}
+                    />
+                    <span className="text-sm text-card-foreground">{t('autoSync')}</span>
+                </label>
             </div>
 
             <div className={`flex flex-col gap-3 pt-2 ${onCancel ? 'sm:flex-row' : ''}`}>

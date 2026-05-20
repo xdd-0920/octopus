@@ -4,7 +4,7 @@ import {
     MorphingDialogContainer,
     MorphingDialogContent,
 } from '@/components/ui/morphing-dialog';
-import { CheckCircle2, DollarSign, Key, Layers, MessageSquare, XCircle, PlugZap, Loader2 } from 'lucide-react';
+import { CheckCircle2, DollarSign, Key, Layers, MessageSquare, XCircle, PlugZap, Loader2, ChevronDown } from 'lucide-react';
 import { type StatsMetricsFormatted } from '@/api/endpoints/stats';
 import { type Channel, useEnableChannel, useTestChannel } from '@/api/endpoints/channel';
 import { CardContent } from './CardContent';
@@ -12,6 +12,7 @@ import { useTranslations } from 'next-intl';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/animate-ui/components/animate/tooltip';
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/components/common/Toast';
+import { useState, useRef, useEffect } from 'react';
 
 export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; stats: StatsMetricsFormatted; layout?: 'grid' | 'list' }) {
     const t = useTranslations('channel.card');
@@ -21,11 +22,35 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
     const enableChannel = useEnableChannel();
     const testChannel = useTestChannel();
     const isListLayout = layout === 'list';
+    const [selectedModel, setSelectedModel] = useState<string>('');
+    const [showModelDropdown, setShowModelDropdown] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    const splitModels = (models: string) =>
+        models
+            .split(',')
+            .map((item) => item.trim())
+            .filter(Boolean);
+
+    const allModels = [...new Set([
+        ...splitModels(channel.model),
+        ...splitModels(channel.custom_model),
+    ])];
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setShowModelDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     const handleTest = (e: React.MouseEvent) => {
         e.stopPropagation();
         testChannel.mutate(
-            { channel_id: channel.id },
+            { channel_id: channel.id, model: selectedModel || undefined },
             {
                 onSuccess: (result) => {
                     if (result.success) {
@@ -79,18 +104,55 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
                             <TooltipContent key={channel.name}>{channel.name}</TooltipContent>
                         </Tooltip>
                         <div className="flex items-center gap-1 shrink-0">
-                            <button
-                                className="rounded-xl p-1.5 hover:bg-muted transition-colors disabled:opacity-50"
-                                disabled={testChannel.isPending || !channel.enabled}
-                                onClick={handleTest}
-                                title={isListLayout ? '测试' : undefined}
-                            >
-                                {testChannel.isPending ? (
-                                    <Loader2 className="size-4 animate-spin text-muted-foreground" />
-                                ) : (
-                                    <PlugZap className="size-4 text-muted-foreground hover:text-foreground" />
+                            <div className="relative" ref={dropdownRef}>
+                                <button
+                                    className="rounded-xl p-1.5 hover:bg-muted transition-colors disabled:opacity-50 flex items-center gap-1"
+                                    disabled={testChannel.isPending || !channel.enabled}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowModelDropdown(!showModelDropdown);
+                                    }}
+                                    title={isListLayout ? '测试' : undefined}
+                                >
+                                    {testChannel.isPending ? (
+                                        <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                                    ) : (
+                                        <PlugZap className="size-4 text-muted-foreground hover:text-foreground" />
+                                    )}
+                                    {allModels.length > 0 && (
+                                        <ChevronDown className="size-3 text-muted-foreground" />
+                                    )}
+                                </button>
+                                {showModelDropdown && allModels.length > 0 && (
+                                    <div className="absolute right-0 top-full mt-1 z-50 min-w-[150px] rounded-xl border border-border bg-card shadow-lg py-1 max-h-[200px] overflow-y-auto">
+                                        <div
+                                            className="px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent cursor-pointer"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedModel('');
+                                                setShowModelDropdown(false);
+                                                handleTest(e);
+                                            }}
+                                        >
+                                            默认模型
+                                        </div>
+                                        {allModels.map((model) => (
+                                            <div
+                                                key={model}
+                                                className={`px-3 py-1.5 text-xs cursor-pointer hover:bg-accent ${selectedModel === model ? 'bg-accent font-medium' : ''}`}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedModel(model);
+                                                    setShowModelDropdown(false);
+                                                    handleTest(e);
+                                                }}
+                                            >
+                                                {model}
+                                            </div>
+                                        ))}
+                                    </div>
                                 )}
-                            </button>
+                            </div>
                             <Switch
                                 checked={channel.enabled}
                                 onCheckedChange={handleEnableChange}

@@ -174,7 +174,6 @@ export function Toolbar() {
                             />
                             <button
                                 onClick={() => {
-                                    setSearchTerm(toolbarItem, '');
                                     setExpandedSearchItem(null);
                                 }}
                                 className="p-0.5 rounded shrink-0 text-muted-foreground hover:text-foreground transition-colors"
