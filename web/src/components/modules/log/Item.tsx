@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Clock, Cpu, Zap, AlertCircle, ArrowDownToLine, ArrowUpFromLine, DollarSign, ArrowRight, ArrowDown, Send, MessageSquare, Loader2, RotateCw, ChevronDown, ChevronUp, Pin, KeyRound } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'motion/react';
@@ -242,7 +242,7 @@ function LogDetailContent({ logId }: { logId: number }) {
     );
 }
 
-export function LogCard({ log }: { log: RelayLogListItem }) {
+export const LogCard = React.memo(function LogCard({ log }: { log: RelayLogListItem }) {
     const t = useTranslations('log.card');
     const { Avatar: ModelAvatar, color: brandColor } = useMemo(
         () => getModelIcon(log.actual_model_name),
@@ -528,4 +528,4 @@ export function LogCard({ log }: { log: RelayLogListItem }) {
             </MorphingDialog>
         </TooltipProvider>
     );
-}
+});

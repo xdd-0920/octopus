@@ -15,7 +15,7 @@ import { VirtualizedGrid } from '@/components/common/VirtualizedGrid';
  */
 export function Log() {
     const t = useTranslations('log');
-    const { logs, hasMore, isLoading, isLoadingMore, loadMore } = useLogs({ pageSize: 10 });
+    const { logs, hasMore, isLoading, isLoadingMore, loadMore } = useLogs({ pageSize: 20 });
 
     const canLoadMore = hasMore && !isLoading && !isLoadingMore && logs.length > 0;
     const handleReachEnd = useCallback(() => {
@@ -41,13 +41,36 @@ export function Log() {
         return null;
     }, [hasMore, isLoading, isLoadingMore, logs.length, t]);
 
+    // 骨架屏加载状态
+    if (isLoading && logs.length === 0) {
+        return (
+            <div className="space-y-4 p-4">
+                {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="rounded-3xl border bg-card p-4 animate-pulse">
+                        <div className="flex items-center gap-4">
+                            <div className="h-10 w-10 rounded-full bg-muted" />
+                            <div className="flex-1 space-y-2">
+                                <div className="h-4 w-3/4 rounded bg-muted" />
+                                <div className="grid grid-cols-7 gap-4">
+                                    {Array.from({ length: 7 }).map((_, j) => (
+                                        <div key={j} className="h-3 rounded bg-muted" />
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
     return (
         <VirtualizedGrid
             items={logs}
             layout="list"
             columns={{ default: 1 }}
             estimateItemHeight={80}
-            overscan={8}
+            overscan={4}
             getItemKey={(log) => `log-${log.id}`}
             renderItem={(log) => <LogCard log={log} />}
             footer={footer}
