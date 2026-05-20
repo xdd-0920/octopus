@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { ArrowUpAZ, Clock3, LayoutGrid, List, Plus, Search, SlidersHorizontal, X } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { ArrowUpAZ, Clock3, LayoutGrid, List, Plus, Search, SlidersHorizontal, X, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
     MorphingDialog,
@@ -82,6 +82,35 @@ export function Toolbar() {
     const setModelFilter = useToolbarViewOptionsStore((s) => s.setModelFilter);
     const [expandedSearchItem, setExpandedSearchItem] = useState<ToolbarPage | null>(null);
     const searchExpanded = expandedSearchItem === toolbarItem;
+    const [inputValue, setInputValue] = useState('');
+    const [appliedSearchTerm, setAppliedSearchTerm] = useState('');
+
+    const handleSearchExpand = useCallback(() => {
+        if (toolbarItem) {
+            setInputValue(searchTerm);
+            setExpandedSearchItem(toolbarItem);
+        }
+    }, [toolbarItem, searchTerm]);
+
+    const handleSearchSubmit = useCallback(() => {
+        if (toolbarItem) {
+            setSearchTerm(toolbarItem, inputValue);
+            setAppliedSearchTerm(inputValue);
+        }
+    }, [toolbarItem, inputValue, setSearchTerm]);
+
+    const handleSearchReset = useCallback(() => {
+        if (toolbarItem) {
+            setInputValue('');
+            setSearchTerm(toolbarItem, '');
+            setAppliedSearchTerm('');
+            setExpandedSearchItem(null);
+        }
+    }, [toolbarItem, setSearchTerm]);
+
+    const handleSearchClose = useCallback(() => {
+        setExpandedSearchItem(null);
+    }, []);
 
     if (!toolbarItem) return null;
     const showLayoutOptions = toolbarItem !== 'group';
@@ -149,33 +178,49 @@ export function Toolbar() {
                 className="flex items-center gap-2"
             >
                 {/* 搜索按钮/展开框 */}
-                <div className="relative h-9 w-9">
+                <div className="relative h-9">
                     {!searchExpanded ? (
                         <motion.button
                             layoutId="search-box"
-                            onClick={() => setExpandedSearchItem(toolbarItem)}
+                            onClick={handleSearchExpand}
                             className={buttonVariants({ variant: "ghost", size: "icon", className: "absolute inset-0 rounded-xl transition-none hover:bg-transparent text-muted-foreground hover:text-foreground" })}
                         >
                             <motion.span layout="position"><Search className="size-4 transition-colors duration-300" /></motion.span>
+                            {searchTerm && (
+                                <span className="absolute -top-1 -right-1 size-2 rounded-full bg-primary" />
+                            )}
                         </motion.button>
                     ) : (
                         <motion.div
                             layoutId="search-box"
-                            className="absolute right-0 top-0 flex items-center gap-2 h-9 px-3 rounded-xl border"
+                            className="absolute right-0 top-0 flex items-center gap-1 h-9 px-2 rounded-xl border bg-card"
                             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                         >
                             <motion.span layout="position"><Search className="size-4 text-muted-foreground shrink-0" /></motion.span>
                             <input
                                 type="text"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(toolbarItem, e.target.value)}
-                                autoFocus
-                                className="w-20 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                            />
-                            <button
-                                onClick={() => {
-                                    setExpandedSearchItem(null);
+                                value={inputValue}
+                                onChange={(e) => setInputValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        handleSearchSubmit();
+                                    }
                                 }}
+                                autoFocus
+                                placeholder={t('popover.searchPlaceholder') || '搜索...'}
+                                className="w-24 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                            />
+                            {inputValue && (
+                                <button
+                                    onClick={handleSearchReset}
+                                    className="p-0.5 rounded shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                                    title="重置搜索"
+                                >
+                                    <RotateCcw className="size-3" />
+                                </button>
+                            )}
+                            <button
+                                onClick={handleSearchClose}
                                 className="p-0.5 rounded shrink-0 text-muted-foreground hover:text-foreground transition-colors"
                             >
                                 <X className="size-3.5" />
