@@ -4,9 +4,9 @@ import {
     MorphingDialogContainer,
     MorphingDialogContent,
 } from '@/components/ui/morphing-dialog';
-import { CheckCircle2, DollarSign, Key, Layers, MessageSquare, XCircle } from 'lucide-react';
+import { CheckCircle2, DollarSign, Key, Layers, MessageSquare, XCircle, PlugZap, Loader2 } from 'lucide-react';
 import { type StatsMetricsFormatted } from '@/api/endpoints/stats';
-import { type Channel, useEnableChannel } from '@/api/endpoints/channel';
+import { type Channel, useEnableChannel, useTestChannel } from '@/api/endpoints/channel';
 import { CardContent } from './CardContent';
 import { useTranslations } from 'next-intl';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/animate-ui/components/animate/tooltip';
@@ -19,7 +19,27 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
     const tSections = useTranslations('channel.detail.sections');
     const tMetrics = useTranslations('channel.detail.metrics');
     const enableChannel = useEnableChannel();
+    const testChannel = useTestChannel();
     const isListLayout = layout === 'list';
+
+    const handleTest = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        testChannel.mutate(
+            { channel_id: channel.id },
+            {
+                onSuccess: (result) => {
+                    if (result.success) {
+                        toast.success(`测试通过 (${result.response_time_ms}ms)`);
+                    } else {
+                        toast.error(result.error || '测试失败');
+                    }
+                },
+                onError: (error) => {
+                    toast.error(error.message);
+                },
+            }
+        );
+    };
 
     const splitModels = (models: string) =>
         models
@@ -58,12 +78,26 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
                             </TooltipTrigger>
                             <TooltipContent key={channel.name}>{channel.name}</TooltipContent>
                         </Tooltip>
-                        <Switch
-                            checked={channel.enabled}
-                            onCheckedChange={handleEnableChange}
-                            disabled={enableChannel.isPending}
-                            onClick={(e) => e.stopPropagation()}
-                        />
+                        <div className="flex items-center gap-1 shrink-0">
+                            <button
+                                className="rounded-xl p-1.5 hover:bg-muted transition-colors disabled:opacity-50"
+                                disabled={testChannel.isPending || !channel.enabled}
+                                onClick={handleTest}
+                                title={isListLayout ? '测试' : undefined}
+                            >
+                                {testChannel.isPending ? (
+                                    <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                                ) : (
+                                    <PlugZap className="size-4 text-muted-foreground hover:text-foreground" />
+                                )}
+                            </button>
+                            <Switch
+                                checked={channel.enabled}
+                                onCheckedChange={handleEnableChange}
+                                disabled={enableChannel.isPending}
+                                onClick={(e) => e.stopPropagation()}
+                            />
+                        </div>
                     </header>
 
                     {isListLayout ? (

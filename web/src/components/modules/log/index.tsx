@@ -1,9 +1,9 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
-import { useLogs } from '@/api/endpoints/log';
+import { useCallback, useMemo, useState, useRef } from 'react';
+import { useLogs, type LogSearchFilters } from '@/api/endpoints/log';
 import { LogCard } from './Item';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Search, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { VirtualizedGrid } from '@/components/common/VirtualizedGrid';
 import { motion, AnimatePresence } from 'motion/react';
@@ -48,20 +48,92 @@ function LogSkeleton({ count = 6 }: { count?: number }) {
 }
 
 /**
+ * 日志搜索栏
+ */
+function LogSearchBar({ onSearch }: { onSearch: (filters: LogSearchFilters) => void }) {
+    const t = useTranslations('log');
+    const [modelName, setModelName] = useState('');
+    const [apiKeyName, setApiKeyName] = useState('');
+    const [keyword, setKeyword] = useState('');
+    const timerRef = useRef<ReturnType<typeof setTimeout>>(null);
+
+    const doSearch = useCallback(() => {
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => {
+            onSearch({
+                modelName: modelName.trim() || undefined,
+                apiKeyName: apiKeyName.trim() || undefined,
+                keyword: keyword.trim() || undefined,
+            });
+        }, 300);
+    }, [modelName, apiKeyName, keyword, onSearch]);
+
+    const clearAll = useCallback(() => {
+        setModelName('');
+        setApiKeyName('');
+        setKeyword('');
+        onSearch({});
+    }, [onSearch]);
+
+    const hasFilters = modelName || apiKeyName || keyword;
+
+    return (
+        <div className="flex flex-wrap items-center gap-2 p-3 bg-card rounded-2xl border border-border">
+            <Search className="size-4 text-muted-foreground shrink-0" />
+            <input
+                type="text"
+                placeholder={t('search.modelName')}
+                value={modelName}
+                onChange={(e) => { setModelName(e.target.value); doSearch(); }}
+                className="flex-1 min-w-[120px] bg-transparent border-none outline-none text-sm placeholder:text-muted-foreground/50"
+            />
+            <input
+                type="text"
+                placeholder={t('search.apiKeyName')}
+                value={apiKeyName}
+                onChange={(e) => { setApiKeyName(e.target.value); doSearch(); }}
+                className="flex-1 min-w-[120px] bg-transparent border-none outline-none text-sm placeholder:text-muted-foreground/50"
+            />
+            <input
+                type="text"
+                placeholder={t('search.keyword')}
+                value={keyword}
+                onChange={(e) => { setKeyword(e.target.value); doSearch(); }}
+                className="flex-1 min-w-[100px] bg-transparent border-none outline-none text-sm placeholder:text-muted-foreground/50"
+            />
+            {hasFilters && (
+                <button
+                    onClick={clearAll}
+                    className="shrink-0 p-1 rounded-lg hover:bg-muted transition-colors"
+                >
+                    <X className="size-4 text-muted-foreground" />
+                </button>
+            )}
+        </div>
+    );
+}
+
+/**
  * 日志页面组件
  * - 初始加载 pageSize 条历史日志
  * - SSE 实时推送新日志
  * - 滚动自动加载更多
+ * - 搜索过滤
  */
 export function Log() {
     const t = useTranslations('log');
-    const { logs, hasMore, isLoading, isLoadingMore, loadMore } = useLogs({ pageSize: 20 });
+    const [searchFilters, setSearchFilters] = useState<LogSearchFilters>({});
+    const { logs, hasMore, isLoading, isLoadingMore, loadMore } = useLogs({ pageSize: 20, search: searchFilters });
 
     const canLoadMore = hasMore && !isLoading && !isLoadingMore && logs.length > 0;
     const handleReachEnd = useCallback(() => {
         if (!canLoadMore) return;
         void loadMore();
     }, [canLoadMore, loadMore]);
+
+    const handleSearch = useCallback((filters: LogSearchFilters) => {
+        setSearchFilters(filters);
+    }, []);
 
     const footer = useMemo(() => {
         if (hasMore && (isLoading || isLoadingMore)) {
@@ -83,36 +155,52 @@ export function Log() {
 
     // 加载状态 - 显示骨架屏
     if (isLoading && logs.length === 0) {
-        return <LogSkeleton count={6} />;
+        return (
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="h-full flex flex-col gap-4"
+            >
+                <LogSearchBar onSearch={handleSearch} />
+                <LogSkeleton count={6} />
+            </motion.div>
+        );
     }
 
     // 空状态
     if (!isLoading && logs.length === 0) {
         return (
             <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.3 }}
-                className="flex flex-col items-center justify-center h-64 gap-4"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="h-full flex flex-col gap-4"
             >
-                <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="32"
-                        height="32"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="text-muted-foreground"
-                    >
-                        <path d="M12 20h9" />
-                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-                    </svg>
-                </div>
-                <p className="text-muted-foreground text-sm">{t('list.empty')}</p>
+                <LogSearchBar onSearch={handleSearch} />
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.3 }}
+                    className="flex flex-col items-center justify-center h-64 gap-4"
+                >
+                    <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="32"
+                            height="32"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="text-muted-foreground"
+                        >
+                            <path d="M12 20h9" />
+                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                        </svg>
+                    </div>
+                    <p className="text-muted-foreground text-sm">{t('list.empty')}</p>
+                </motion.div>
             </motion.div>
         );
     }
@@ -124,21 +212,24 @@ export function Log() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.2 }}
-                className="h-full"
+                className="h-full flex flex-col gap-2"
             >
-                <VirtualizedGrid
-                    items={logs}
-                    layout="list"
-                    columns={{ default: 1 }}
-                    estimateItemHeight={80}
-                    overscan={4}
-                    getItemKey={(log) => `log-${log.id}`}
-                    renderItem={(log) => <LogCard log={log} />}
-                    footer={footer}
-                    onReachEnd={handleReachEnd}
-                    reachEndEnabled={canLoadMore}
-                    reachEndOffset={2}
-                />
+                <LogSearchBar onSearch={handleSearch} />
+                <div className="flex-1 min-h-0">
+                    <VirtualizedGrid
+                        items={logs}
+                        layout="list"
+                        columns={{ default: 1 }}
+                        estimateItemHeight={80}
+                        overscan={4}
+                        getItemKey={(log) => `log-${log.id}`}
+                        renderItem={(log) => <LogCard log={log} />}
+                        footer={footer}
+                        onReachEnd={handleReachEnd}
+                        reachEndEnabled={canLoadMore}
+                        reachEndOffset={2}
+                    />
+                </div>
             </motion.div>
         </AnimatePresence>
     );

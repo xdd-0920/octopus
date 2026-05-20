@@ -131,6 +131,18 @@
                 "last30Days": "30天"
             }
         },
+        "apiKeyStats": {
+            "title": "密钥用量",
+            "noData": "暂无密钥统计数据"
+        },
+        "realtime": {
+            "title": "实时监控",
+            "activeRequests": "活跃请求",
+            "qps": "QPS",
+            "avgResponseTime": "平均响应",
+            "errorRate": "错误率",
+            "channelCount": "在线渠道"
+        },
         "rank": {
             "title": "排行榜",
             "sortByCost": "金额",
@@ -428,6 +440,11 @@
         "list": {
             "noMore": "没有更多日志了",
             "empty": "暂无日志记录"
+        },
+        "search": {
+            "modelName": "模型名称",
+            "apiKeyName": "密钥名称",
+            "keyword": "错误关键词"
         },
         "card": {
             "error": "错误",

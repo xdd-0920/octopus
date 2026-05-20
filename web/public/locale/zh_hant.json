@@ -131,6 +131,18 @@
                 "last30Days": "30天"
             }
         },
+        "apiKeyStats": {
+            "title": "密鑰用量",
+            "noData": "暫無密鑰統計資料"
+        },
+        "realtime": {
+            "title": "即時監控",
+            "activeRequests": "活躍請求",
+            "qps": "QPS",
+            "avgResponseTime": "平均回應",
+            "errorRate": "錯誤率",
+            "channelCount": "在線渠道"
+        },
         "rank": {
             "title": "排行榜",
             "sortByCost": "金額",
@@ -428,6 +440,11 @@
         "list": {
             "noMore": "沒有更多日誌了",
             "empty": "暫無日誌記錄"
+        },
+        "search": {
+            "modelName": "模型名稱",
+            "apiKeyName": "密鑰名稱",
+            "keyword": "錯誤關鍵詞"
         },
         "card": {
             "error": "錯誤",

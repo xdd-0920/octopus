@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"strings"
 	"sync"
 	"time"
 
@@ -11,7 +12,56 @@ import (
 	"github.com/bestruirui/octopus/internal/model"
 	"github.com/bestruirui/octopus/internal/utils/log"
 	"github.com/bestruirui/octopus/internal/utils/snowflake"
+	"gorm.io/gorm"
 )
+
+// LogSearchParams 日志搜索参数
+type LogSearchParams struct {
+	ModelName  string // 按模型名称搜索（LIKE 模糊匹配）
+	APIKeyName string // 按 API Key 名称搜索（LIKE 模糊匹配）
+	Keyword    string // 按错误信息关键词搜索（LIKE 模糊匹配）
+}
+
+// hasSearchFilters 检查是否有搜索过滤条件
+func (p LogSearchParams) hasSearchFilters() bool {
+	return p.ModelName != "" || p.APIKeyName != "" || p.Keyword != ""
+}
+
+// applySearchToQuery 将搜索条件应用到数据库查询
+func applySearchToQuery(query *gorm.DB, search LogSearchParams) *gorm.DB {
+	if search.ModelName != "" {
+		query = query.Where("request_model_name LIKE ?", "%"+search.ModelName+"%")
+	}
+	if search.APIKeyName != "" {
+		query = query.Where("request_api_key_name LIKE ?", "%"+search.APIKeyName+"%")
+	}
+	if search.Keyword != "" {
+		query = query.Where("error LIKE ?", "%"+search.Keyword+"%")
+	}
+	return query
+}
+
+// matchSearchFilters 检查缓存的日志是否匹配搜索条件
+func matchSearchFilters(log model.RelayLog, search LogSearchParams) bool {
+	if search.ModelName != "" && !strings.Contains(log.RequestModelName, search.ModelName) {
+		return false
+	}
+	if search.APIKeyName != "" && !strings.Contains(log.RequestAPIKeyName, search.APIKeyName) {
+		return false
+	}
+	if search.Keyword != "" && !strings.Contains(log.Error, search.Keyword) {
+		return false
+	}
+	return true
+}
+
+// relayLogListItemSelectColumns 查询列表时选择的列（排除大文本字段）
+var relayLogListItemSelectColumns = []string{
+	"id", "time", "request_model_name", "request_api_key_name",
+	"channel_id", "channel_name", "actual_model_name",
+	"input_tokens", "output_tokens", "cached_tokens",
+	"ftut", "use_time", "cost", "error", "attempts", "total_attempts",
+}
 
 const relayLogMaxSize = 20
 const relayLogMaxSizeNoDB = 100 // 当不保存到数据库时，允许更大的缓存用于实时查询
@@ -254,34 +304,58 @@ func RelayLogList(ctx context.Context, startTime, endTime *int, page, pageSize i
 }
 
 // RelayLogListForAPI 查询日志列表（用于API返回，不包含大文本字段）
-func RelayLogListForAPI(ctx context.Context, startTime, endTime *int, page, pageSize int) ([]model.RelayLogListItem, error) {
+// 支持时间范围过滤和关键词搜索
+func RelayLogListForAPI(ctx context.Context, startTime, endTime *int, search LogSearchParams, page, pageSize int) ([]model.RelayLogListItem, error) {
 	enabled, err := SettingGetBool(model.SettingKeyRelayLogKeepEnabled)
 	if err != nil {
 		return nil, err
 	}
 	hasTimeFilter := startTime != nil && endTime != nil
+	hasSearchFilter := search.hasSearchFilters()
 
-	// 快速获取缓存大小和计数
+	// 快速路径：无时间过滤、无搜索过滤、缓存足够的第一页数据可以直接从缓存返回
+	if !hasTimeFilter && !hasSearchFilter && page == 1 {
+		relayLogCacheLock.Lock()
+		cacheCount := len(relayLogCache)
+		if cacheCount >= pageSize {
+			result := make([]model.RelayLogListItem, 0, pageSize)
+			start := cacheCount - 1
+			end := start - pageSize
+			if end < -1 {
+				end = -1
+			}
+			for i := start; i > end; i-- {
+				result = append(result, convertToRelayLogListItem(relayLogCache[i]))
+			}
+			relayLogCacheLock.Unlock()
+			return result, nil
+		}
+		relayLogCacheLock.Unlock()
+	}
+
+	// 有搜索过滤或无缓存时，直接从数据库查询（如果启用）
+	if enabled && hasSearchFilter {
+		offset := (page - 1) * pageSize
+		query := db.GetDB().WithContext(ctx)
+		if hasTimeFilter {
+			query = query.Where("time >= ? AND time <= ?", *startTime, *endTime)
+		}
+		query = applySearchToQuery(query, search)
+
+		var dbLogs []model.RelayLogListItem
+		if err := query.Select(relayLogListItemSelectColumns).
+			Order("id DESC").Offset(offset).Limit(pageSize).Find(&dbLogs).Error; err != nil {
+			return nil, err
+		}
+		return dbLogs, nil
+	}
+
+	// 缓存为空且启用了数据库，直接查询数据库
 	relayLogCacheLock.Lock()
 	cacheCount := len(relayLogCache)
-	// 如果没有时间过滤且只需要缓存数据，直接返回
-	if !hasTimeFilter && page == 1 && cacheCount >= pageSize {
-		result := make([]model.RelayLogListItem, 0, pageSize)
-		// 从缓存末尾开始取（最新的日志在末尾）
-		start := cacheCount - 1
-		end := start - pageSize
-		if end < -1 {
-			end = -1
-		}
-		for i := start; i > end; i-- {
-			result = append(result, convertToRelayLogListItem(relayLogCache[i]))
-		}
-		relayLogCacheLock.Unlock()
-		return result, nil
-	}
-	// 如果缓存为空且启用了数据库，直接查询数据库
+	relayLogCacheLock.Unlock()
+
 	if cacheCount == 0 && enabled {
-		relayLogCacheLock.Unlock()
 		offset := (page - 1) * pageSize
 		query := db.GetDB().WithContext(ctx)
 		if hasTimeFilter {
@@ -289,30 +363,35 @@ func RelayLogListForAPI(ctx context.Context, startTime, endTime *int, page, page
 		}
 
 		var dbLogs []model.RelayLogListItem
-		if err := query.Select("id", "time", "request_model_name", "request_api_key_name", "channel_id", "channel_name", "actual_model_name", "input_tokens", "output_tokens", "cached_tokens", "ftut", "use_time", "cost", "error", "attempts", "total_attempts").
+		if err := query.Select(relayLogListItemSelectColumns).
 			Order("id DESC").Offset(offset).Limit(pageSize).Find(&dbLogs).Error; err != nil {
 			return nil, err
 		}
 		return dbLogs, nil
 	}
-	relayLogCacheLock.Unlock()
 
-	// 通用处理逻辑
+	// 通用处理逻辑：缓存 + 数据库混合
 	offset := (page - 1) * pageSize
 	var result []model.RelayLogListItem
 
 	// 获取缓存中符合条件的日志
 	relayLogCacheLock.Lock()
 	var cachedLogs []model.RelayLog
-	if hasTimeFilter {
-		// 有时间过滤时，需要遍历
+	if hasTimeFilter || hasSearchFilter {
 		for _, log := range relayLogCache {
-			if log.Time >= int64(*startTime) && log.Time <= int64(*endTime) {
-				cachedLogs = append(cachedLogs, log)
+			// 时间过滤
+			if hasTimeFilter {
+				if log.Time < int64(*startTime) || log.Time > int64(*endTime) {
+					continue
+				}
 			}
+			// 搜索过滤
+			if hasSearchFilter && !matchSearchFilters(log, search) {
+				continue
+			}
+			cachedLogs = append(cachedLogs, log)
 		}
 	} else {
-		// 没有时间过滤，直接复制
 		cachedLogs = make([]model.RelayLog, len(relayLogCache))
 		copy(cachedLogs, relayLogCache)
 	}
@@ -325,20 +404,19 @@ func RelayLogListForAPI(ctx context.Context, startTime, endTime *int, page, page
 
 	cacheCount = len(cachedLogs)
 
-	// 先从缓存中取（缓存是最新的日志）
+	// 先从缓存中取
 	if offset < cacheCount {
 		cacheEnd := offset + pageSize
 		if cacheEnd > cacheCount {
 			cacheEnd = cacheCount
 		}
-		// 将缓存中的日志转换为列表项
 		result = make([]model.RelayLogListItem, 0, cacheEnd-offset)
 		for _, log := range cachedLogs[offset:cacheEnd] {
 			result = append(result, convertToRelayLogListItem(log))
 		}
 	}
 
-	// 如果启用了日志保存，缓存不够时从数据库补充
+	// 从数据库补充
 	if enabled {
 		remaining := pageSize - len(result)
 		if remaining > 0 {
@@ -349,13 +427,11 @@ func RelayLogListForAPI(ctx context.Context, startTime, endTime *int, page, page
 
 			query := db.GetDB().WithContext(ctx)
 			if hasTimeFilter {
-				// 使用时间索引进行过滤
 				query = query.Where("time >= ? AND time <= ?", *startTime, *endTime)
 			}
 
 			var dbLogs []model.RelayLogListItem
-			// 只查询需要的字段，排除大文本字段，使用 id 索引进行排序
-			if err := query.Select("id", "time", "request_model_name", "request_api_key_name", "channel_id", "channel_name", "actual_model_name", "input_tokens", "output_tokens", "cached_tokens", "ftut", "use_time", "cost", "error", "attempts", "total_attempts").
+			if err := query.Select(relayLogListItemSelectColumns).
 				Order("id DESC").Offset(dbOffset).Limit(remaining).Find(&dbLogs).Error; err != nil {
 				return nil, err
 			}

@@ -363,3 +363,45 @@ export function useSyncChannel() {
         },
     });
 }
+
+/**
+ * 渠道测试结果
+ */
+export interface ChannelTestResult {
+    success: boolean;
+    response_time_ms: number;
+    status_code: number;
+    error?: string;
+    response?: string;
+}
+
+/**
+ * 渠道测试请求
+ */
+export interface ChannelTestRequest {
+    channel_id: number;
+    model?: string;
+}
+
+/**
+ * 测试渠道连通性 Hook
+ * 
+ * @example
+ * const testChannel = useTestChannel();
+ * 
+ * testChannel.mutate({ channel_id: 1, model: 'gpt-3.5-turbo' });
+ * // onSuccess / onSettled 中可以拿到 testChannel.data
+ */
+export function useTestChannel() {
+    return useMutation({
+        mutationFn: async (data: ChannelTestRequest) => {
+            return apiClient.post<ChannelTestResult>('/api/v1/channel/test', data);
+        },
+        onSuccess: (data) => {
+            logger.log('渠道测试完成:', data);
+        },
+        onError: (error) => {
+            logger.error('渠道测试失败:', error);
+        },
+    });
+}

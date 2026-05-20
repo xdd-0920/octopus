@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/bestruirui/octopus/internal/helper"
@@ -25,8 +26,18 @@ import (
 	"github.com/tmaxmax/go-sse"
 )
 
+var activeRequests atomic.Int64
+
+// ActiveRequests 返回当前正在处理的请求数量
+func ActiveRequests() int64 {
+	return activeRequests.Load()
+}
+
 // Handler 处理入站请求并转发到上游服务
 func Handler(inboundType inbound.InboundType, c *gin.Context) {
+	activeRequests.Add(1)
+	defer activeRequests.Add(-1)
+
 	// 解析请求
 	internalRequest, inAdapter, err := parseRequest(inboundType, c)
 	if err != nil {

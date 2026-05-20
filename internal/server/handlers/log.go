@@ -69,8 +69,15 @@ func listLog(c *gin.Context) {
 		endTime = &et
 	}
 
+	// 搜索参数
+	search := op.LogSearchParams{
+		ModelName: c.Query("model_name"),
+		APIKeyName: c.Query("api_key_name"),
+		Keyword:   c.Query("keyword"),
+	}
+
 	// 使用优化的函数，不包含大文本字段
-	logs, err := op.RelayLogListForAPI(c.Request.Context(), startTime, endTime, page, pageSize)
+	logs, err := op.RelayLogListForAPI(c.Request.Context(), startTime, endTime, search, page, pageSize)
 	if err != nil {
 		resp.Error(c, http.StatusInternalServerError, err.Error())
 		return

@@ -131,6 +131,18 @@
                 "last30Days": "30 Days"
             }
         },
+        "apiKeyStats": {
+            "title": "Key Usage",
+            "noData": "No key statistics available"
+        },
+        "realtime": {
+            "title": "Real-time Monitor",
+            "activeRequests": "Active",
+            "qps": "QPS",
+            "avgResponseTime": "Avg Response",
+            "errorRate": "Error Rate",
+            "channelCount": "Channels"
+        },
         "rank": {
             "title": "Ranking",
             "sortByCost": "Cost",
@@ -428,6 +440,11 @@
         "list": {
             "noMore": "No more logs",
             "empty": "No log records"
+        },
+        "search": {
+            "modelName": "Model Name",
+            "apiKeyName": "Key Name",
+            "keyword": "Error Keyword"
         },
         "card": {
             "error": "Error",

@@ -98,6 +98,21 @@ type ChannelFetchModelRequest struct {
 	Proxy   bool                  `json:"proxy"`
 }
 
+// ChannelTestRequest 渠道测试请求
+type ChannelTestRequest struct {
+	ChannelID int    `json:"channel_id" binding:"required"`
+	Model     string `json:"model"`
+}
+
+// ChannelTestResult 渠道测试结果
+type ChannelTestResult struct {
+	Success        bool   `json:"success"`
+	ResponseTimeMs int64  `json:"response_time_ms"`
+	StatusCode     int    `json:"status_code"`
+	Error          string `json:"error,omitempty"`
+	Response       string `json:"response,omitempty"`
+}
+
 func (c *Channel) GetBaseUrl() string {
 	if c == nil || len(c.BaseUrls) == 0 {
 		return ""

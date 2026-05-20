@@ -78,6 +78,18 @@ export interface LogListParams {
     page_size?: number;
     start_time?: number;
     end_time?: number;
+    model_name?: string;
+    api_key_name?: string;
+    keyword?: string;
+}
+
+/**
+ * 日志搜索条件
+ */
+export interface LogSearchFilters {
+    modelName?: string;
+    apiKeyName?: string;
+    keyword?: string;
 }
 
 /**
@@ -119,7 +131,8 @@ export async function getLogDetail(id: number): Promise<RelayLog> {
     return result;
 }
 
-const logsInfiniteQueryKey = (pageSize: number) => ['logs', 'infinite', pageSize] as const;
+const logsInfiniteQueryKey = (pageSize: number, search?: LogSearchFilters) =>
+    ['logs', 'infinite', pageSize, search] as const;
 
 /**
  * 日志管理 Hook
@@ -134,8 +147,8 @@ const logsInfiniteQueryKey = (pageSize: number) => ['logs', 'infinite', pageSize
  * // 滚动到底部时加载更多
  * if (hasMore && !isLoadingMore) loadMore();
  */
-export function useLogs(options: { pageSize?: number } = {}) {
-    const { pageSize = 20 } = options;
+export function useLogs(options: { pageSize?: number; search?: LogSearchFilters } = {}) {
+    const { pageSize = 20, search } = options;
 
     const [isConnected, setIsConnected] = useState(false);
     const [error, setError] = useState<Error | null>(null);
@@ -144,12 +157,15 @@ export function useLogs(options: { pageSize?: number } = {}) {
     const queryClient = useQueryClient();
 
     const logsQuery = useInfiniteQuery({
-        queryKey: logsInfiniteQueryKey(pageSize),
+        queryKey: logsInfiniteQueryKey(pageSize, search),
         initialPageParam: 1,
         queryFn: async ({ pageParam }) => {
             const params = new URLSearchParams();
             params.set('page', String(pageParam));
             params.set('page_size', String(pageSize));
+            if (search?.modelName) params.set('model_name', search.modelName);
+            if (search?.apiKeyName) params.set('api_key_name', search.apiKeyName);
+            if (search?.keyword) params.set('keyword', search.keyword);
             const result = await apiClient.get<RelayLogListItem[] | null>(`/api/v1/log/list?${params.toString()}`);
             return result ?? [];
         },
@@ -189,8 +205,12 @@ export function useLogs(options: { pageSize?: number } = {}) {
         }
     }, [logsQuery]);
 
+    // 活跃搜索时禁用 SSE（SSE 只能推送未过滤的实时日志）
+    const hasSearchFilters = !!(search?.modelName || search?.apiKeyName || search?.keyword);
+
     useEffect(() => {
         let cancelled = false;
+        if (hasSearchFilters) return;
 
         const connect = async () => {
             try {
@@ -209,7 +229,7 @@ export function useLogs(options: { pageSize?: number } = {}) {
                     try {
                         const log: RelayLogListItem = JSON.parse(event.data);
                         queryClient.setQueryData(
-                            logsInfiniteQueryKey(pageSize),
+                            logsInfiniteQueryKey(pageSize, search),
                             (old: InfiniteData<RelayLogListItem[], number> | undefined) => {
                                 if (!old) {
                                     return { pages: [[log]], pageParams: [1] };
@@ -248,11 +268,11 @@ export function useLogs(options: { pageSize?: number } = {}) {
             eventSourceRef.current = null;
             setIsConnected(false);
         };
-    }, [pageSize, queryClient]);
+    }, [pageSize, search, queryClient, hasSearchFilters]);
 
     const clear = useCallback(() => {
-        queryClient.removeQueries({ queryKey: logsInfiniteQueryKey(pageSize) });
-    }, [pageSize, queryClient]);
+        queryClient.removeQueries({ queryKey: logsInfiniteQueryKey(pageSize, search) });
+    }, [pageSize, search, queryClient]);
 
     return {
         logs,

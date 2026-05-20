@@ -182,3 +182,28 @@ export function useStatsAPIKey() {
         refetchOnMount: 'always',
     });
 }
+
+/**
+ * 实时监控统计数据
+ */
+export interface RealtimeStats {
+    active_requests: number;
+    qps: number;
+    avg_response_ms: number;
+    error_rate: number;
+    channel_count: number;
+}
+
+/**
+ * 获取实时监控统计数据 Hook
+ */
+export function useRealtimeStats() {
+    return useQuery({
+        queryKey: ['stats', 'realtime'],
+        queryFn: async () => {
+            return apiClient.get<RealtimeStats>('/api/v1/stats/realtime');
+        },
+        refetchInterval: 2000, // 每2秒刷新
+        refetchOnMount: 'always',
+    });
+}
