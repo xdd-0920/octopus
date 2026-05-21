@@ -59,11 +59,19 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-                setShowModelDropdown(false);
-                setModelSearch('');
-                setDropdownPos(null);
+            // 检查点击是否在portal下拉框内部（通过data-dropdown属性）
+            const target = event.target as Node;
+            const portalDropdown = document.querySelector('[data-dropdown="channel-model"]');
+            if (portalDropdown && portalDropdown.contains(target)) {
+                return;
             }
+            // 检查点击是否在原始dropdownRef内部（按钮区域）
+            if (dropdownRef.current && dropdownRef.current.contains(target)) {
+                return;
+            }
+            setShowModelDropdown(false);
+            setModelSearch('');
+            setDropdownPos(null);
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -150,8 +158,10 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
                                 </button>
                                 {showModelDropdown && allModels.length > 0 && createPortal(
                                     <div
+                                        data-dropdown="channel-model"
                                         className="fixed z-[10000] min-w-[180px] rounded-xl border border-border bg-card shadow-lg py-1 max-h-[260px] flex flex-col overflow-hidden"
                                         style={dropdownPos ? { top: dropdownPos.top, right: dropdownPos.right } : undefined}
+                                        onMouseDown={(e) => e.stopPropagation()}
                                     >
                                         <div className="px-3 py-1.5 flex items-center justify-between text-xs border-b border-border/50">
                                             <span className="text-muted-foreground">流式</span>
