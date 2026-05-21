@@ -172,9 +172,9 @@ export function VirtualizedGrid<T>({
                                         key={virtualRow.key}
                                         data-index={virtualRow.index}
                                         ref={rowVirtualizer.measureElement}
-                                        className="absolute left-0 top-0 w-full"
+                                        className="absolute left-0 w-full"
                                         style={{
-                                            transform: `translateY(${virtualRow.start}px)`,
+                                            top: `${virtualRow.start}px`,
                                         }}
                                     >
                                         {footer}
@@ -192,9 +192,9 @@ export function VirtualizedGrid<T>({
                                     key={virtualRow.key}
                                     data-index={virtualRow.index}
                                     ref={rowVirtualizer.measureElement}
-                                    className="absolute left-0 top-0 w-full"
+                                    className="absolute left-0 w-full"
                                     style={{
-                                        transform: `translateY(${virtualRow.start}px)`,
+                                        top: `${virtualRow.start}px`,
                                     }}
                                 >
                                     <div
