@@ -102,6 +102,7 @@ type ChannelFetchModelRequest struct {
 type ChannelTestRequest struct {
 	ChannelID int    `json:"channel_id" binding:"required"`
 	Model     string `json:"model"`
+	Stream    *bool  `json:"stream,omitempty"` // 是否使用流式模式，默认 true
 }
 
 // ChannelTestResult 渠道测试结果

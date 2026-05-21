@@ -55,6 +55,7 @@
     "toolbar": {
         "popover": {
             "ariaLabel": "视图选项",
+            "searchPlaceholder": "搜索...",
             "layout": "布局",
             "sort": "排序",
             "grid": "网格",

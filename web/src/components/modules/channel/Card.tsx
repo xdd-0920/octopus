@@ -24,6 +24,7 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
     const isListLayout = layout === 'list';
     const [selectedModel, setSelectedModel] = useState<string>('');
     const [showModelDropdown, setShowModelDropdown] = useState(false);
+    const [streamMode, setStreamMode] = useState(true);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     const splitModels = (models: string) =>
@@ -49,7 +50,7 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
 
     const runTest = (model?: string) => {
         testChannel.mutate(
-            { channel_id: channel.id, model },
+            { channel_id: channel.id, model, stream: streamMode },
             {
                 onSuccess: (result) => {
                     if (result.success) {
@@ -123,6 +124,15 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
                                 </button>
                                 {showModelDropdown && allModels.length > 0 && (
                                     <div className="absolute right-0 top-full mt-1 z-[100] min-w-[150px] rounded-xl border border-border bg-card shadow-lg py-1 max-h-[200px] overflow-y-auto">
+                                        <div className="px-3 py-1.5 flex items-center justify-between text-xs border-b border-border/50 mb-1">
+                                            <span className="text-muted-foreground">流式</span>
+                                            <Switch
+                                                checked={streamMode}
+                                                onCheckedChange={setStreamMode}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="scale-75 origin-right"
+                                            />
+                                        </div>
                                         {allModels.map((model) => (
                                             <div
                                                 key={model}

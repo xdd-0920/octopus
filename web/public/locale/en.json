@@ -55,6 +55,7 @@
     "toolbar": {
         "popover": {
             "ariaLabel": "View options",
+            "searchPlaceholder": "Search...",
             "layout": "Layout",
             "sort": "Sort",
             "grid": "Grid",

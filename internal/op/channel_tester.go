@@ -1,6 +1,7 @@
 package op
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -8,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/bestruirui/octopus/internal/model"
@@ -40,6 +42,60 @@ type testUsage struct {
 
 type testRawResponse struct {
 	Usage *testUsage `json:"usage"`
+}
+
+// streamChunk 流式响应的单个数据块
+type streamChunk struct {
+	Choices []struct {
+		Delta struct {
+			Content string `json:"content"`
+		} `json:"delta"`
+		FinishReason *string `json:"finish_reason"`
+	} `json:"choices"`
+	Usage *testUsage `json:"usage"`
+}
+
+// parseStreamResponse 解析 SSE 流式响应，返回首字时间(ms)、聚合响应内容、输入/输出 tokens
+func parseStreamResponse(body io.Reader, startTime time.Time) (firstTokenMs int64, response string, inputTokens, outputTokens int) {
+	scanner := bufio.NewScanner(body)
+	scanner.Buffer(make([]byte, 0, 64*1024), 64*1024)
+	var contentBuilder strings.Builder
+	var gotFirstToken bool
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+		data := strings.TrimPrefix(line, "data: ")
+		if data == "[DONE]" {
+			break
+		}
+
+		var chunk streamChunk
+		if json.Unmarshal([]byte(data), &chunk) != nil {
+			continue
+		}
+
+		// 记录首字时间
+		if !gotFirstToken && len(chunk.Choices) > 0 && chunk.Choices[0].Delta.Content != "" {
+			firstTokenMs = time.Since(startTime).Milliseconds()
+			gotFirstToken = true
+		}
+
+		// 累积响应内容
+		for _, choice := range chunk.Choices {
+			contentBuilder.WriteString(choice.Delta.Content)
+		}
+
+		// 提取 usage（部分 provider 在最后一个 chunk 中返回）
+		if chunk.Usage != nil {
+			inputTokens = chunk.Usage.PromptTokens
+			outputTokens = chunk.Usage.CompletionTokens
+		}
+	}
+
+	return firstTokenMs, contentBuilder.String(), inputTokens, outputTokens
 }
 
 // TestChannel 测试渠道连通性和实时性
@@ -83,11 +139,16 @@ func TestChannel(ctx context.Context, req model.ChannelTestRequest) model.Channe
 		}
 	}
 
+	// 确定是否使用流式模式（默认 true）
+	useStream := true
+	if req.Stream != nil {
+		useStream = *req.Stream
+	}
+
 	// 构建测试消息（必须包含 messages 字段）
-	stream := false
 	testContent := "Hello"
 	testReq := &transformerModel.InternalLLMRequest{
-		Stream: &stream,
+		Stream: &useStream,
 		Model:  testModel,
 		Messages: []transformerModel.Message{
 			{
@@ -128,34 +189,41 @@ func TestChannel(ctx context.Context, req model.ChannelTestRequest) model.Channe
 	result.StatusCode = resp.StatusCode
 	result.ResponseTimeMs = time.Since(startTime).Milliseconds()
 
-	// 读取响应体
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
-	if err != nil {
-		result.Error = fmt.Sprintf("读取响应失败: %v", err)
-		return result
+	var inputTokens, outputTokens int
+	var firstTokenTime int64
+	var responseBody string
+
+	if useStream {
+		// 流式模式：逐行读取 SSE 事件
+		firstTokenTime, responseBody, inputTokens, outputTokens = parseStreamResponse(resp.Body, startTime)
+	} else {
+		// 非流式模式：一次性读取响应
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+		if readErr != nil {
+			result.Error = fmt.Sprintf("读取响应失败: %v", readErr)
+			return result
+		}
+		responseBody = string(body)
+		var rawResp testRawResponse
+		if json.Unmarshal(body, &rawResp) == nil && rawResp.Usage != nil {
+			inputTokens = rawResp.Usage.PromptTokens
+			outputTokens = rawResp.Usage.CompletionTokens
+		}
 	}
 
 	// 格式化响应内容
 	var formatted bytes.Buffer
-	if err := json.Indent(&formatted, body, "", "  "); err == nil {
+	if json.Indent(&formatted, []byte(responseBody), "", "  ") == nil {
 		result.Response = formatted.String()
 	} else {
-		result.Response = string(body)
-	}
-
-	// 尝试解析 usage 信息
-	var inputTokens, outputTokens int
-	var rawResp testRawResponse
-	if json.Unmarshal(body, &rawResp) == nil && rawResp.Usage != nil {
-		inputTokens = rawResp.Usage.PromptTokens
-		outputTokens = rawResp.Usage.CompletionTokens
+		result.Response = responseBody
 	}
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		result.Success = true
-		log.Debugf("channel test success: %d, response: %s", req.ChannelID, result.Response)
+		log.Debugf("channel test success: %d, stream=%v, response: %s", req.ChannelID, useStream, result.Response)
 	} else {
-		result.Error = string(body)
+		result.Error = responseBody
 		if len(result.Error) > 500 {
 			result.Error = result.Error[:500] + "..."
 		}
@@ -164,6 +232,10 @@ func TestChannel(ctx context.Context, req model.ChannelTestRequest) model.Channe
 
 	// 写入测试日志，包含完整的请求/响应上下文
 	useTimeMs := int(result.ResponseTimeMs)
+	ftut := useTimeMs
+	if firstTokenTime > 0 {
+		ftut = int(firstTokenTime)
+	}
 	attemptStatus := model.AttemptSuccess
 	attemptMsg := "测试通过"
 	if !result.Success {
@@ -179,7 +251,7 @@ func TestChannel(ctx context.Context, req model.ChannelTestRequest) model.Channe
 		ActualModelName:   testModel,
 		InputTokens:       inputTokens,
 		OutputTokens:      outputTokens,
-		Ftut:              useTimeMs, // 非流式请求，首字时间 = 总用时
+		Ftut:              ftut,
 		UseTime:           useTimeMs,
 		RequestContent:    string(reqJSON),
 		ResponseContent:   result.Response,

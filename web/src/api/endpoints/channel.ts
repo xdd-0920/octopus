@@ -381,6 +381,7 @@ export interface ChannelTestResult {
 export interface ChannelTestRequest {
     channel_id: number;
     model?: string;
+    stream?: boolean;
 }
 
 /**

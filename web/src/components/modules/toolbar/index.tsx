@@ -193,7 +193,7 @@ export function Toolbar() {
                     ) : (
                         <motion.div
                             layoutId="search-box"
-                            className="absolute right-0 top-0 flex items-center gap-1 h-9 px-2 rounded-xl border bg-card shadow-sm z-10"
+                            className="relative flex items-center gap-1 h-9 px-2 rounded-xl border bg-card shadow-sm z-10"
                             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                         >
                             <motion.span layout="position"><Search className="size-4 text-muted-foreground shrink-0" /></motion.span>
@@ -207,7 +207,7 @@ export function Toolbar() {
                                     }
                                 }}
                                 autoFocus
-                                placeholder={t('popover.searchPlaceholder') || '搜索...'}
+                                placeholder={t('popover.searchPlaceholder')}
                                 className="w-24 sm:w-32 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                             />
                             {inputValue && (
@@ -229,7 +229,7 @@ export function Toolbar() {
                     )}
                 </div>
 
-                <div className={cn("flex items-center gap-2", searchExpanded && "hidden sm:flex")}>
+                <div className="flex items-center gap-2 shrink-0">
                     <Popover>
                     <PopoverTrigger asChild>
                         <button
