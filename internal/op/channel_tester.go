@@ -32,6 +32,16 @@ func testHTTPClient() *http.Client {
 	}
 }
 
+// testUsage 用于从原始响应中提取 usage 信息
+type testUsage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+}
+
+type testRawResponse struct {
+	Usage *testUsage `json:"usage"`
+}
+
 // TestChannel 测试渠道连通性和实时性
 // 发送一条简单的 "Hello" 消息并检查返回结果
 func TestChannel(ctx context.Context, req model.ChannelTestRequest) model.ChannelTestResult {
@@ -89,6 +99,9 @@ func TestChannel(ctx context.Context, req model.ChannelTestRequest) model.Channe
 		},
 	}
 
+	// 序列化请求内容用于日志
+	reqJSON, _ := json.Marshal(testReq)
+
 	// 构建 HTTP 请求
 	outReq, err := outAdapter.TransformRequest(
 		ctx,
@@ -122,15 +135,24 @@ func TestChannel(ctx context.Context, req model.ChannelTestRequest) model.Channe
 		return result
 	}
 
+	// 格式化响应内容
+	var formatted bytes.Buffer
+	if err := json.Indent(&formatted, body, "", "  "); err == nil {
+		result.Response = formatted.String()
+	} else {
+		result.Response = string(body)
+	}
+
+	// 尝试解析 usage 信息
+	var inputTokens, outputTokens int
+	var rawResp testRawResponse
+	if json.Unmarshal(body, &rawResp) == nil && rawResp.Usage != nil {
+		inputTokens = rawResp.Usage.PromptTokens
+		outputTokens = rawResp.Usage.CompletionTokens
+	}
+
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		result.Success = true
-		// 尝试格式化 JSON 响应
-		var formatted bytes.Buffer
-		if err := json.Indent(&formatted, body, "", "  "); err == nil {
-			result.Response = formatted.String()
-		} else {
-			result.Response = string(body)
-		}
 		log.Debugf("channel test success: %d, response: %s", req.ChannelID, result.Response)
 	} else {
 		result.Error = string(body)
@@ -140,7 +162,8 @@ func TestChannel(ctx context.Context, req model.ChannelTestRequest) model.Channe
 		log.Warnf("channel test failed: %d, status: %d, error: %s", req.ChannelID, resp.StatusCode, result.Error)
 	}
 
-	// 写入测试日志，方便在日志页面查看测试记录
+	// 写入测试日志，包含完整的请求/响应上下文
+	useTimeMs := int(result.ResponseTimeMs)
 	attemptStatus := model.AttemptSuccess
 	attemptMsg := "测试通过"
 	if !result.Success {
@@ -148,14 +171,19 @@ func TestChannel(ctx context.Context, req model.ChannelTestRequest) model.Channe
 		attemptMsg = result.Error
 	}
 	testLog := model.RelayLog{
-		Time:             startTime.Unix(),
-		RequestModelName: testModel,
+		Time:              startTime.Unix(),
+		RequestModelName:  testModel,
 		RequestAPIKeyName: "渠道测试",
-		ChannelId:        channel.ID,
-		ChannelName:      channel.Name,
-		ActualModelName:  testModel,
-		UseTime:          int(result.ResponseTimeMs),
-		Error:            result.Error,
+		ChannelId:         channel.ID,
+		ChannelName:       channel.Name,
+		ActualModelName:   testModel,
+		InputTokens:       inputTokens,
+		OutputTokens:      outputTokens,
+		Ftut:              useTimeMs, // 非流式请求，首字时间 = 总用时
+		UseTime:           useTimeMs,
+		RequestContent:    string(reqJSON),
+		ResponseContent:   result.Response,
+		Error:             result.Error,
 		Attempts: []model.ChannelAttempt{
 			{
 				ChannelID:   channel.ID,
@@ -163,7 +191,7 @@ func TestChannel(ctx context.Context, req model.ChannelTestRequest) model.Channe
 				ModelName:   testModel,
 				AttemptNum:  1,
 				Status:      attemptStatus,
-				Duration:    int(result.ResponseTimeMs),
+				Duration:    useTimeMs,
 				Msg:         attemptMsg,
 			},
 		},
