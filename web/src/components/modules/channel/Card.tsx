@@ -12,6 +12,7 @@ import { useTranslations } from 'next-intl';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/animate-ui/components/animate/tooltip';
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/components/common/Toast';
+import { cn } from '@/lib/utils';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Search } from 'lucide-react';
 
