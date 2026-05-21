@@ -330,7 +330,7 @@ export function GroupCard({ group }: { group: Group }) {
                 ))}
             </div>
 
-            <section className="rounded-xl border border-border/50 bg-muted/30 overflow-hidden relative h-101">
+            <section className="rounded-xl border border-border/50 bg-muted/30 relative h-101">
                 <MemberList
                     members={members}
                     onReorder={setMembers}

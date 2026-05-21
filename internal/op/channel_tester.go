@@ -46,6 +46,7 @@ type testRawResponse struct {
 
 // streamChunk 流式响应的单个数据块
 type streamChunk struct {
+	Model string `json:"model"`
 	Choices []struct {
 		Delta struct {
 			Content string `json:"content"`
@@ -55,8 +56,25 @@ type streamChunk struct {
 	Usage *testUsage `json:"usage"`
 }
 
+// streamResponse 用于拼接流式响应的完整 JSON 结果
+type streamResponse struct {
+	ID      string `json:"id"`
+	Object  string `json:"object"`
+	Created int64  `json:"created"`
+	Model   string `json:"model"`
+	Choices []struct {
+		Index        int     `json:"index"`
+		Message      struct {
+			Role    string `json:"role"`
+			Content string `json:"content"`
+		} `json:"message"`
+		FinishReason *string `json:"finish_reason"`
+	} `json:"choices"`
+	Usage *testUsage `json:"usage"`
+}
+
 // parseSSEChunk 解析单个 SSE 数据块并更新结果
-func parseSSEChunk(data string, contentBuilder *strings.Builder, gotFirstToken *bool, startTime time.Time, firstTokenMs *int64, inputTokens, outputTokens *int) {
+func parseSSEChunk(data string, contentBuilder *strings.Builder, gotFirstToken *bool, startTime time.Time, firstTokenMs *int64, inputTokens, outputTokens *int, modelName *string, finishReason *string) {
 	if data == "[DONE]" {
 		return
 	}
@@ -64,6 +82,11 @@ func parseSSEChunk(data string, contentBuilder *strings.Builder, gotFirstToken *
 	var chunk streamChunk
 	if json.Unmarshal([]byte(data), &chunk) != nil {
 		return
+	}
+
+	// 记录模型名称
+	if chunk.Model != "" && *modelName == "" {
+		*modelName = chunk.Model
 	}
 
 	// 记录首字时间
@@ -75,6 +98,9 @@ func parseSSEChunk(data string, contentBuilder *strings.Builder, gotFirstToken *
 	// 累积响应内容
 	for _, choice := range chunk.Choices {
 		contentBuilder.WriteString(choice.Delta.Content)
+		if choice.FinishReason != nil {
+			*finishReason = *choice.FinishReason
+		}
 	}
 
 	// 提取 usage（部分 provider 在最后一个 chunk 中返回）
@@ -93,6 +119,8 @@ func parseStreamResponse(body io.Reader, startTime time.Time) (firstTokenMs int6
 	var gotFirstToken bool
 	var dataBuffer strings.Builder // 累积同一事件的 data: 行
 	var done bool
+	var modelName string
+	var finishReason string
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -110,7 +138,7 @@ func parseStreamResponse(body io.Reader, startTime time.Time) (firstTokenMs int6
 				break
 			}
 
-			parseSSEChunk(data, &contentBuilder, &gotFirstToken, startTime, &firstTokenMs, &inputTokens, &outputTokens)
+			parseSSEChunk(data, &contentBuilder, &gotFirstToken, startTime, &firstTokenMs, &inputTokens, &outputTokens, &modelName, &finishReason)
 			continue
 		}
 
@@ -128,11 +156,53 @@ func parseStreamResponse(body io.Reader, startTime time.Time) (firstTokenMs int6
 	if !done && dataBuffer.Len() > 0 {
 		data := dataBuffer.String()
 		if data != "[DONE]" {
-			parseSSEChunk(data, &contentBuilder, &gotFirstToken, startTime, &firstTokenMs, &inputTokens, &outputTokens)
+			parseSSEChunk(data, &contentBuilder, &gotFirstToken, startTime, &firstTokenMs, &inputTokens, &outputTokens, &modelName, &finishReason)
 		}
 	}
 
-	return firstTokenMs, contentBuilder.String(), inputTokens, outputTokens
+	// 构建完整 JSON 响应对象，与非流式格式保持一致
+	content := contentBuilder.String()
+	var fr *string
+	if finishReason != "" {
+		fr = &finishReason
+	}
+	respObj := streamResponse{
+		ID:      fmt.Sprintf("chatcmpl-test-%d", startTime.UnixMilli()),
+		Object:  "chat.completion",
+		Created: startTime.Unix(),
+		Model:   modelName,
+		Choices: []struct {
+			Index        int     `json:"index"`
+			Message      struct {
+				Role    string `json:"role"`
+				Content string `json:"content"`
+			} `json:"message"`
+			FinishReason *string `json:"finish_reason"`
+		}{
+			{
+				Index: 0,
+				Message: struct {
+					Role    string `json:"role"`
+					Content string `json:"content"`
+				}{
+					Role:    "assistant",
+					Content: content,
+				},
+				FinishReason: fr,
+			},
+		},
+		Usage: &testUsage{
+			PromptTokens:     inputTokens,
+			CompletionTokens: outputTokens,
+		},
+	}
+
+	respBytes, err := json.Marshal(respObj)
+	if err != nil {
+		return firstTokenMs, content, inputTokens, outputTokens
+	}
+
+	return firstTokenMs, string(respBytes), inputTokens, outputTokens
 }
 
 // TestChannel 测试渠道连通性和实时性

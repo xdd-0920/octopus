@@ -291,16 +291,16 @@ export function MemberList({
                 <span className="text-sm">{t('card.empty')}</span>
             </div>
 
-            <div
-                className={cn(
-                    'h-full overflow-y-auto transition-opacity duration-200',
-                    isEmpty ? 'opacity-0' : 'opacity-100'
-                )}
-                ref={scrollContainerRef}
+            <DragDropContext
+                onDragStart={() => onDragStart?.()}
+                onDragEnd={handleDragEnd}
             >
-                <DragDropContext
-                    onDragStart={() => onDragStart?.()}
-                    onDragEnd={handleDragEnd}
+                <div
+                    className={cn(
+                        'h-full overflow-y-auto transition-opacity duration-200',
+                        isEmpty ? 'opacity-0' : 'opacity-100'
+                    )}
+                    ref={scrollContainerRef}
                 >
                     <Droppable droppableId={`members-${layoutScope}`}>
                         {(droppableProvided) => (
@@ -340,8 +340,8 @@ export function MemberList({
                             </div>
                         )}
                     </Droppable>
-                </DragDropContext>
-            </div>
+                </div>
+            </DragDropContext>
         </div>
     );
 }

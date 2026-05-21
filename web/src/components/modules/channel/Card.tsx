@@ -12,7 +12,8 @@ import { useTranslations } from 'next-intl';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/animate-ui/components/animate/tooltip';
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/components/common/Toast';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { Search } from 'lucide-react';
 
 export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; stats: StatsMetricsFormatted; layout?: 'grid' | 'list' }) {
     const t = useTranslations('channel.card');
@@ -25,7 +26,9 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
     const [selectedModel, setSelectedModel] = useState<string>('');
     const [showModelDropdown, setShowModelDropdown] = useState(false);
     const [streamMode, setStreamMode] = useState(true);
+    const [modelSearch, setModelSearch] = useState('');
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const searchInputRef = useRef<HTMLInputElement>(null);
 
     const splitModels = (models: string) =>
         models
@@ -38,10 +41,23 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
         ...splitModels(channel.custom_model),
     ])];
 
+    const filteredModels = useMemo(() => {
+        if (!modelSearch.trim()) return allModels;
+        const keyword = modelSearch.trim().toLowerCase();
+        return allModels.filter((m) => m.toLowerCase().includes(keyword));
+    }, [allModels, modelSearch]);
+
+    useEffect(() => {
+        if (showModelDropdown && searchInputRef.current) {
+            searchInputRef.current.focus();
+        }
+    }, [showModelDropdown]);
+
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
                 setShowModelDropdown(false);
+                setModelSearch('');
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -94,7 +110,10 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
     return (
         <MorphingDialog>
             <MorphingDialogTrigger className="w-full">
-                <article className="flex flex-col gap-4 rounded-3xl border border-border bg-card text-card-foreground p-4 transition-all duration-300">
+                <article className={cn(
+                    "flex flex-col gap-4 rounded-3xl border border-border bg-card text-card-foreground p-4 transition-all duration-300 relative",
+                    showModelDropdown && "z-50"
+                )}>
                     <header className="relative flex items-center justify-between gap-2">
                         <Tooltip side="top" sideOffset={10} align="center">
                             <TooltipTrigger asChild>
@@ -123,8 +142,8 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
                                     )}
                                 </button>
                                 {showModelDropdown && allModels.length > 0 && (
-                                    <div className="absolute right-0 top-full mt-1 z-[100] min-w-[150px] rounded-xl border border-border bg-card shadow-lg py-1 max-h-[200px] overflow-y-auto">
-                                        <div className="px-3 py-1.5 flex items-center justify-between text-xs border-b border-border/50 mb-1">
+                                    <div className="absolute right-0 top-full mt-1 z-[100] min-w-[180px] rounded-xl border border-border bg-card shadow-lg py-1 max-h-[260px] flex flex-col overflow-hidden">
+                                        <div className="px-3 py-1.5 flex items-center justify-between text-xs border-b border-border/50">
                                             <span className="text-muted-foreground">流式</span>
                                             <Switch
                                                 checked={streamMode}
@@ -133,20 +152,43 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
                                                 className="scale-75 origin-right"
                                             />
                                         </div>
-                                        {allModels.map((model) => (
-                                            <div
-                                                key={model}
-                                                className={`px-3 py-1.5 text-xs cursor-pointer hover:bg-accent ${selectedModel === model ? 'bg-accent font-medium' : ''}`}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setSelectedModel(model);
-                                                    setShowModelDropdown(false);
-                                                    runTest(model);
-                                                }}
-                                            >
-                                                {model}
+                                        {allModels.length > 3 && (
+                                            <div className="px-2 py-1.5 border-b border-border/50">
+                                                <div className="relative">
+                                                    <Search className="pointer-events-none absolute left-1.5 top-1/2 size-3 -translate-y-1/2 text-muted-foreground" />
+                                                    <input
+                                                        ref={searchInputRef}
+                                                        type="text"
+                                                        placeholder="搜索模型..."
+                                                        value={modelSearch}
+                                                        onChange={(e) => setModelSearch(e.target.value)}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="w-full h-6 rounded-md border border-border/50 bg-background/70 pl-6 pr-2 text-xs outline-none focus:border-primary/50"
+                                                    />
+                                                </div>
                                             </div>
-                                        ))}
+                                        )}
+                                        <div className="overflow-y-auto flex-1">
+                                            {filteredModels.length === 0 ? (
+                                                <div className="px-3 py-2 text-xs text-muted-foreground text-center">无匹配模型</div>
+                                            ) : (
+                                                filteredModels.map((model) => (
+                                                    <div
+                                                        key={model}
+                                                        className={`px-3 py-1.5 text-xs cursor-pointer hover:bg-accent ${selectedModel === model ? 'bg-accent font-medium' : ''}`}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedModel(model);
+                                                            setShowModelDropdown(false);
+                                                            setModelSearch('');
+                                                            runTest(model);
+                                                        }}
+                                                    >
+                                                        {model}
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </div>
