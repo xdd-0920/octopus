@@ -69,7 +69,7 @@ function MemberItem({
             ref={dnd.innerRef}
             // eslint-disable-next-line react-hooks/refs
             {...dnd.draggableProps}
-            className={cn('rounded-lg grid transition-[grid-template-rows] duration-200', isRemoving ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]')}
+            className={cn('rounded-lg grid', dnd.isDragging ? '' : 'transition-[grid-template-rows] duration-200', isRemoving ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]')}
             // eslint-disable-next-line react-hooks/refs
             style={{
                 /* eslint-disable-next-line react-hooks/refs */
@@ -135,7 +135,6 @@ function MemberItem({
 
                 {(!showConfirmDelete || !confirmDelete) && (
                     <motion.button
-                        layoutId={`delete-btn-member-${layoutScope ?? 'default'}-${member.id}`}
                         type="button"
                         onClick={() => showConfirmDelete ? setConfirmDelete(true) : onRemove(member.id)}
                         className="p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-colors"
@@ -151,9 +150,11 @@ function MemberItem({
                 <AnimatePresence>
                     {showConfirmDelete && confirmDelete && (
                         <motion.div
-                            layoutId={`delete-btn-member-${layoutScope ?? 'default'}-${member.id}`}
                             className="absolute inset-0 flex items-center justify-center gap-2 bg-destructive p-1.5 rounded-lg"
-                            transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.15 }}
                         >
                             <button
                                 type="button"

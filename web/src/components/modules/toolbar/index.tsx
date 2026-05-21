@@ -178,12 +178,12 @@ export function Toolbar() {
                 className="flex items-center gap-2"
             >
                 {/* 搜索按钮/展开框 */}
-                <div className="relative h-9">
+                <div className={cn("relative h-9", searchExpanded ? "flex-1 min-w-0" : "w-9")}>
                     {!searchExpanded ? (
                         <motion.button
                             layoutId="search-box"
                             onClick={handleSearchExpand}
-                            className={buttonVariants({ variant: "ghost", size: "icon", className: "absolute inset-0 rounded-xl transition-none hover:bg-transparent text-muted-foreground hover:text-foreground" })}
+                            className={buttonVariants({ variant: "ghost", size: "icon", className: "relative rounded-xl transition-none hover:bg-transparent text-muted-foreground hover:text-foreground" })}
                         >
                             <motion.span layout="position"><Search className="size-4 transition-colors duration-300" /></motion.span>
                             {searchTerm && (
@@ -193,7 +193,7 @@ export function Toolbar() {
                     ) : (
                         <motion.div
                             layoutId="search-box"
-                            className="relative flex items-center gap-1 h-9 px-2 rounded-xl border bg-card shadow-sm z-10"
+                            className="relative flex items-center gap-1 h-9 w-full px-2 rounded-xl border bg-card shadow-sm z-10"
                             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                         >
                             <motion.span layout="position"><Search className="size-4 text-muted-foreground shrink-0" /></motion.span>

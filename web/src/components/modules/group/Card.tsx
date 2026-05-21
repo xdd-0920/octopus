@@ -127,28 +127,18 @@ export function GroupCard({ group }: { group: Group }) {
         return 'mode' in v && typeof (v as { mode?: unknown }).mode === 'number';
     })();
 
-    const priorityByItemId = useMemo(() => {
-        const map = new Map<number, number>();
-        (group.items || []).forEach((item) => {
-            if (item.id !== undefined) map.set(item.id, item.priority);
-        });
-        return map;
-    }, [group.items]);
-
     const handleDragStart = useCallback(() => { isDragging.current = true; }, []);
     const handleDragFinish = useCallback(() => { isDragging.current = false; }, []);
 
     const handleDropReorder = useCallback((nextMembers: SelectedMember[]) => {
+        // 与编辑分组时保持一致：始终发送所有 items 的完整优先级，而非仅发送变更项
+        // 避免因 group.items 尚未更新（API 响应延迟）导致 priorityByItemId 过时而产生位置偏差
         const itemsToUpdate = nextMembers
             .map((m, i) => ({ member: m, newPriority: i + 1 }))
-            .filter(({ member, newPriority }) => {
-                if (!member.item_id) return false;
-                const origPriority = priorityByItemId.get(member.item_id);
-                return origPriority !== undefined && origPriority !== newPriority;
-            })
+            .filter(({ member }) => member.item_id != null)
             .map(({ member, newPriority }) => ({ id: member.item_id!, priority: newPriority, weight: member.weight ?? 1 }));
         if (itemsToUpdate.length > 0) updateGroup.mutate({ id: group.id!, items_to_update: itemsToUpdate }, { onSuccess, onError });
-    }, [group.id, priorityByItemId, updateGroup, onSuccess, onError]);
+    }, [group.id, updateGroup, onSuccess, onError]);
 
     const handleRemoveMember = useCallback((id: string) => {
         const member = members.find((m) => m.id === id);
@@ -159,16 +149,19 @@ export function GroupCard({ group }: { group: Group }) {
         setMembers((prev) => prev.map((m) => m.id === id ? { ...m, weight } : m));
         if (weightTimerRef.current) clearTimeout(weightTimerRef.current);
         weightTimerRef.current = setTimeout(() => {
-            const member = membersRef.current.find((m) => m.id === id);
+            const currentMembers = membersRef.current;
+            const idx = currentMembers.findIndex((m) => m.id === id);
+            if (idx === -1) return;
+            const member = currentMembers[idx];
             if (!member?.item_id) return;
-            const priority = priorityByItemId.get(member.item_id);
-            if (!priority) return;
+            // 使用当前成员在数组中的位置作为优先级，与拖拽排序保持一致
+            const priority = idx + 1;
             updateGroup.mutate(
                 { id: group.id!, items_to_update: [{ id: member.item_id, priority, weight }] },
                 { onSuccess, onError }
             );
         }, 500);
-    }, [group.id, priorityByItemId, updateGroup, onSuccess, onError]);
+    }, [group.id, updateGroup, onSuccess, onError]);
 
     const handleSubmitEdit = useCallback((values: GroupEditorValues, onDone?: () => void) => {
         if (!group.id) return;

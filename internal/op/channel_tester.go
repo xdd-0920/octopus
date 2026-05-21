@@ -55,43 +55,80 @@ type streamChunk struct {
 	Usage *testUsage `json:"usage"`
 }
 
+// parseSSEChunk 解析单个 SSE 数据块并更新结果
+func parseSSEChunk(data string, contentBuilder *strings.Builder, gotFirstToken *bool, startTime time.Time, firstTokenMs *int64, inputTokens, outputTokens *int) {
+	if data == "[DONE]" {
+		return
+	}
+
+	var chunk streamChunk
+	if json.Unmarshal([]byte(data), &chunk) != nil {
+		return
+	}
+
+	// 记录首字时间
+	if !*gotFirstToken && len(chunk.Choices) > 0 && chunk.Choices[0].Delta.Content != "" {
+		*firstTokenMs = time.Since(startTime).Milliseconds()
+		*gotFirstToken = true
+	}
+
+	// 累积响应内容
+	for _, choice := range chunk.Choices {
+		contentBuilder.WriteString(choice.Delta.Content)
+	}
+
+	// 提取 usage（部分 provider 在最后一个 chunk 中返回）
+	if chunk.Usage != nil {
+		*inputTokens = chunk.Usage.PromptTokens
+		*outputTokens = chunk.Usage.CompletionTokens
+	}
+}
+
 // parseStreamResponse 解析 SSE 流式响应，返回首字时间(ms)、聚合响应内容、输入/输出 tokens
+// 按照 SSE 规范，多个 data: 行通过空行分隔为事件，同一事件的多行 data: 用换行符拼接后解析
 func parseStreamResponse(body io.Reader, startTime time.Time) (firstTokenMs int64, response string, inputTokens, outputTokens int) {
 	scanner := bufio.NewScanner(body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 64*1024)
 	var contentBuilder strings.Builder
 	var gotFirstToken bool
+	var dataBuffer strings.Builder // 累积同一事件的 data: 行
+	var done bool
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		if !strings.HasPrefix(line, "data: ") {
+
+		// 空行 = SSE 事件边界，尝试解析已累积的数据
+		if strings.TrimSpace(line) == "" {
+			if dataBuffer.Len() == 0 {
+				continue
+			}
+			data := dataBuffer.String()
+			dataBuffer.Reset()
+
+			if data == "[DONE]" {
+				done = true
+				break
+			}
+
+			parseSSEChunk(data, &contentBuilder, &gotFirstToken, startTime, &firstTokenMs, &inputTokens, &outputTokens)
 			continue
 		}
-		data := strings.TrimPrefix(line, "data: ")
-		if data == "[DONE]" {
-			break
-		}
 
-		var chunk streamChunk
-		if json.Unmarshal([]byte(data), &chunk) != nil {
-			continue
+		// 累积 data: 行（多个 data: 行拼接为完整事件数据）
+		if strings.HasPrefix(line, "data: ") {
+			if dataBuffer.Len() > 0 {
+				dataBuffer.WriteByte('\n')
+			}
+			dataBuffer.WriteString(strings.TrimPrefix(line, "data: "))
 		}
+		// 忽略其他 SSE 字段（event:, id:, retry:, 注释行）
+	}
 
-		// 记录首字时间
-		if !gotFirstToken && len(chunk.Choices) > 0 && chunk.Choices[0].Delta.Content != "" {
-			firstTokenMs = time.Since(startTime).Milliseconds()
-			gotFirstToken = true
-		}
-
-		// 累积响应内容
-		for _, choice := range chunk.Choices {
-			contentBuilder.WriteString(choice.Delta.Content)
-		}
-
-		// 提取 usage（部分 provider 在最后一个 chunk 中返回）
-		if chunk.Usage != nil {
-			inputTokens = chunk.Usage.PromptTokens
-			outputTokens = chunk.Usage.CompletionTokens
+	// 处理流末尾没有空行结尾的最后一个事件
+	if !done && dataBuffer.Len() > 0 {
+		data := dataBuffer.String()
+		if data != "[DONE]" {
+			parseSSEChunk(data, &contentBuilder, &gotFirstToken, startTime, &firstTokenMs, &inputTokens, &outputTokens)
 		}
 	}
 
