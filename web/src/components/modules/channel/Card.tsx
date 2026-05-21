@@ -13,7 +13,8 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/animate-ui
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/components/common/Toast';
 import { cn } from '@/lib/utils';
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Search } from 'lucide-react';
 
 export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; stats: StatsMetricsFormatted; layout?: 'grid' | 'list' }) {
@@ -28,7 +29,9 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
     const [showModelDropdown, setShowModelDropdown] = useState(false);
     const [streamMode, setStreamMode] = useState(true);
     const [modelSearch, setModelSearch] = useState('');
+    const [dropdownPos, setDropdownPos] = useState<{ top: number; right: number } | null>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const buttonRef = useRef<HTMLButtonElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
 
     const splitModels = (models: string) =>
@@ -59,6 +62,7 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
                 setShowModelDropdown(false);
                 setModelSearch('');
+                setDropdownPos(null);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -111,10 +115,7 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
     return (
         <MorphingDialog>
             <MorphingDialogTrigger className="w-full">
-                <article className={cn(
-                    "flex flex-col gap-4 rounded-3xl border border-border bg-card text-card-foreground p-4 transition-all duration-300 relative",
-                    showModelDropdown && "z-50"
-                )}>
+                <article className="flex flex-col gap-4 rounded-3xl border border-border bg-card text-card-foreground p-4 transition-all duration-300 relative">
                     <header className="relative flex items-center justify-between gap-2">
                         <Tooltip side="top" sideOffset={10} align="center">
                             <TooltipTrigger asChild>
@@ -125,10 +126,15 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
                         <div className="flex items-center gap-1 shrink-0">
                             <div className="relative" ref={dropdownRef}>
                                 <button
+                                    ref={buttonRef}
                                     className="rounded-xl p-1.5 hover:bg-muted transition-colors disabled:opacity-50 flex items-center gap-1"
                                     disabled={testChannel.isPending || !channel.enabled}
                                     onClick={(e) => {
                                         e.stopPropagation();
+                                        if (!showModelDropdown && buttonRef.current) {
+                                            const rect = buttonRef.current.getBoundingClientRect();
+                                            setDropdownPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+                                        }
                                         setShowModelDropdown(!showModelDropdown);
                                     }}
                                     title={isListLayout ? '测试' : undefined}
@@ -142,8 +148,11 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
                                         <ChevronDown className="size-3 text-muted-foreground" />
                                     )}
                                 </button>
-                                {showModelDropdown && allModels.length > 0 && (
-                                    <div className="absolute right-0 top-full mt-1 z-[100] min-w-[180px] rounded-xl border border-border bg-card shadow-lg py-1 max-h-[260px] flex flex-col overflow-hidden">
+                                {showModelDropdown && allModels.length > 0 && createPortal(
+                                    <div
+                                        className="fixed z-[10000] min-w-[180px] rounded-xl border border-border bg-card shadow-lg py-1 max-h-[260px] flex flex-col overflow-hidden"
+                                        style={dropdownPos ? { top: dropdownPos.top, right: dropdownPos.right } : undefined}
+                                    >
                                         <div className="px-3 py-1.5 flex items-center justify-between text-xs border-b border-border/50">
                                             <span className="text-muted-foreground">流式</span>
                                             <Switch
@@ -182,6 +191,7 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
                                                             setSelectedModel(model);
                                                             setShowModelDropdown(false);
                                                             setModelSearch('');
+                                                            setDropdownPos(null);
                                                             runTest(model);
                                                         }}
                                                     >
@@ -190,7 +200,8 @@ export function Card({ channel, stats, layout = 'grid' }: { channel: Channel; st
                                                 ))
                                             )}
                                         </div>
-                                    </div>
+                                    </div>,
+                                    document.body
                                 )}
                             </div>
                             <Switch
